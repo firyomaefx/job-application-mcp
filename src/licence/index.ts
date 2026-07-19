@@ -21,7 +21,9 @@ import {
   type Entitlement,
   type Plan,
   isActive,
+  isPro,
 } from "../lib/entitlement.js";
+import { recordEvent } from "./events.js";
 
 const DEVICE_FILE = "device-id";
 const ENT_FILE = "entitlement.json";
@@ -138,14 +140,23 @@ export function mintToken(ent: Entitlement, secret: string): string {
 export function storeEntitlement(ent: Entitlement): void {
   const dir = dataDir();
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  const prev = currentEntitlement();
   writeFileSync(entitlementPath(), JSON.stringify(withMac(ent), null, 2), "utf8");
+  // Record the plan transition (N7). activate = Free→Pro; renew = Pro→Pro;
+  // downgrade = any →Free.
+  if (isPro(ent) && !isPro(prev)) recordEvent("activate", ent.plan);
+  else if (isPro(ent) && isPro(prev)) recordEvent("renew", ent.plan);
+  else if (!isPro(ent) && isPro(prev)) recordEvent("downgrade", ent.plan, "stored as free");
 }
 
 /** Clear the stored entitlement (return to free). */
 export function clearEntitlement(): void {
   const dir = dataDir();
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  const prev = currentEntitlement();
   writeFileSync(entitlementPath(), JSON.stringify(withMac(FREE_ENTITLEMENT), null, 2), "utf8");
+  if (isPro(prev)) recordEvent("downgrade", "free", "cleared");
+  else recordEvent("clear", "free");
 }
 
 /**
@@ -185,16 +196,25 @@ export async function activate(opts: {
 
 /**
  * Offline grace: if we have a stored entitlement that has expired but within
- * OFFLINE_GRACE_DAYS, allow continued use. Returns the ent or FREE.
+ * OFFLINE_GRACE_DAYS, allow continued use. Returns the ent or FREE. Records an
+ * 'expire' event (once per stored entitlement) once the grace window passes.
  */
+let expireRecorded = false;
 export function entitlementWithGrace(now = new Date()): Entitlement {
   const raw = readEntitlementFile();
   if (!raw) return FREE_ENTITLEMENT;
-  if (isActive(raw, now)) return raw;
+  if (isActive(raw, now)) {
+    expireRecorded = false;
+    return raw;
+  }
   if (raw.expires_at) {
     const expiry = new Date(raw.expires_at).getTime();
     const graceEnd = expiry + OFFLINE_GRACE_DAYS * 86_400_000;
     if (now.getTime() < graceEnd) return raw;
+  }
+  if (isPro(raw) && !expireRecorded) {
+    recordEvent("expire", "free", `expired ${raw.expires_at ?? "?"}`);
+    expireRecorded = true;
   }
   return FREE_ENTITLEMENT;
 }
