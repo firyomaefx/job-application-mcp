@@ -63,7 +63,7 @@ async function checkBridge() {
 // This function is serialized by chrome.scripting, so it must not reference
 // any outer-scope variables. It returns a plain array of field metadata.
 function captureFieldsInPage() {
-  const SENSITIVE = /salary|compensation|authorized|visa|sponsor|gender|race|ethnic|disability|consent|agree|ssn|national/i;
+  const SENSITIVE = /salary|compensation|authorized|authorised|visa|sponsor|gender|race|ethnic|disability|consent|agree|ssn|national|criminal/i;
   const SKIP_TYPES = new Set(["hidden", "password", "submit", "button", "image", "file", "reset"]);
 
   function labelFor(el) {

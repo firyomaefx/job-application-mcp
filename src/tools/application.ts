@@ -8,6 +8,7 @@ import {
   saveApplication,
   updateApplicationStatus,
 } from "../store/applications.js";
+import { classifyField } from "../forms/fields.js";
 import type { ApplicationStatus } from "../lib/types.js";
 
 const saveApplicationSchema = z.object({
@@ -46,7 +47,7 @@ export const saveApplicationTool: ToolDef<typeof saveApplicationSchema> = {
       data: app,
       notes: [
         "Draft only. Use autofill_form to preview fields, then submit manually on the employer site.",
-        "Call update_application_status with 'submitted' after you submit on the site.",
+        "After submitting, call request_approval then confirm_submission to record it (never auto-submitted).",
       ],
     };
   },
@@ -138,18 +139,7 @@ export const autofillFormTool: ToolDef<typeof autofillFormSchema> = {
     };
 
     const fields = input.form_fields ?? defaultFormFields();
-    const mapping = fields.map((f) => {
-      const key = guessKey(f);
-      const value = candidateValues[key] ?? "";
-      return {
-        field: f.name,
-        label: f.label ?? f.name,
-        mapped_to: key,
-        value,
-        confidence: value ? "high" : "none",
-        requires_user_review: !value || isSensitive(f),
-      };
-    });
+    const mapping = fields.map((f) => classifyField(f, candidateValues));
 
     return {
       summary: `Previewed autofill for ${mapping.length} field(s) — application ${app.id}${
@@ -158,7 +148,7 @@ export const autofillFormTool: ToolDef<typeof autofillFormSchema> = {
       data: { application_id: app.id, mapping },
       notes: [
         "Review every field, especially sensitive ones (legal questions, salary, work authorization).",
-        "Submit manually on the employer's site, then call update_application_status with 'submitted'.",
+        "Submit manually on the employer's site, then call request_approval + confirm_submission to record it.",
       ],
     };
   },
@@ -172,29 +162,4 @@ function defaultFormFields() {
     { name: "location", label: "Location" },
     { name: "cover_letter", label: "Cover letter" },
   ];
-}
-
-function guessKey(f: { name: string; label?: string }): string {
-  const s = `${f.name} ${f.label ?? ""}`.toLowerCase();
-  if (s.includes("cover")) return "cover_letter";
-  if (s.includes("mail")) return "email";
-  if (s.includes("phone") || s.includes("mobile") || s.includes("tel")) return "phone";
-  if (s.includes("location") || s.includes("city") || s.includes("address")) return "location";
-  if (s.includes("title") || s.includes("headline")) return "headline";
-  if (s.includes("name")) return "full_name";
-  return "";
-}
-
-function isSensitive(f: { name: string; label?: string }): boolean {
-  const s = `${f.name} ${f.label ?? ""}`.toLowerCase();
-  return (
-    s.includes("salary") ||
-    s.includes("authorized") ||
-    s.includes("visa") ||
-    s.includes("gender") ||
-    s.includes("race") ||
-    s.includes("disability") ||
-    s.includes("consent") ||
-    s.includes("agree")
-  );
 }
