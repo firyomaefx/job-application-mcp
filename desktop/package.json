@@ -4,6 +4,7 @@
   "private": true,
   "description": "Desktop wrapper UI for Job Application MCP. Launches the local HTTP bridge and shows your profile, applications, and server status.",
   "license": "AGPL-3.0-or-later",
+  "author": "Job Application MCP contributors",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
