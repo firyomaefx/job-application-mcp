@@ -1,11 +1,19 @@
 import type { AiContext, AiProvider, AiResult } from "./provider.js";
+import { estimateUsage } from "./usage.js";
 
 /**
  * Mock provider — fully local, no network. Upgraded heuristics over the bare
  * free-core suggestions. Used both as the free fallback and in tests.
+ * Reports deterministic estimated usage so cost-control tests run without any
+ * paid API call.
  */
 export class MockProvider implements AiProvider {
   name = "mock";
+
+  private result(text: string, notes: string[], ctx: AiContext): AiResult {
+    const inputText = `${ctx.jobTitle} ${ctx.jobDescription} ${ctx.question ?? ""} ${ctx.cvText}`;
+    return { text, provider: this.name, notes, usage: estimateUsage(inputText, text), cost_usd: 0 };
+  }
 
   async tailorCv(ctx: AiContext): Promise<AiResult> {
     const cvSkills = new Set(ctx.cvText.toLowerCase().split(/\W+/));
@@ -21,11 +29,7 @@ export class MockProvider implements AiProvider {
       `5. Add a quantified achievement (number / % / timeline) near the top.\n\n` +
       `This is a structural draft. Verify every claim against your real experience.`;
 
-    return {
-      text,
-      provider: this.name,
-      notes: ["Heuristic draft — no AI call made.", "Pro with AI provider enabled rewrites prose."],
-    };
+    return this.result(text, ["Heuristic draft — no AI call made.", "Pro with AI provider enabled rewrites prose."], ctx);
   }
 
   async coverLetter(ctx: AiContext): Promise<AiResult> {
@@ -37,11 +41,7 @@ export class MockProvider implements AiProvider {
       `[Paragraph 3: why this company specifically.]\n\n` +
       `Thank you for your time.\n[Your name]`;
 
-    return {
-      text,
-      provider: this.name,
-      notes: ["Heuristic scaffold — fill the bracketed sections.", "Pro with AI provider drafts full prose."],
-    };
+    return this.result(text, ["Heuristic scaffold — fill the bracketed sections.", "Pro with AI provider drafts full prose."], ctx);
   }
 
   async draftAnswer(ctx: AiContext): Promise<AiResult> {
@@ -53,10 +53,6 @@ export class MockProvider implements AiProvider {
       `[Close with relevance to the ${ctx.jobTitle} role.]\n\n` +
       `Verify every claim. Heuristic draft only.`;
 
-    return {
-      text,
-      provider: this.name,
-      notes: ["Heuristic template — rewrite before use."],
-    };
+    return this.result(text, ["Heuristic template — rewrite before use."], ctx);
   }
 }

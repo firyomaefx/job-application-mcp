@@ -76,10 +76,12 @@ test("H2: with an own API key and no entitlement, resolveProvider uses real AI w
   process.env.AI_PROVIDER = "openai";
   process.env.AI_API_KEY = "test-key";
   try {
-    const { provider, usedAi, debited } = await resolveProvider("ai_cv_tailoring", "ai_tailor", "1");
+    const { provider, usedAi, proHosted } = await resolveProvider("ai_cv_tailoring");
     assert.equal(usedAi, true, "own key → real AI path");
-    assert.equal(debited, false, "free user with own key is not debited");
+    assert.equal(proHosted, false, "free user with own key is not on the Pro hosted (debited) path");
     assert.equal(provider.name, "openai");
+    // No credit ledger row should exist for this resolution (no debit attempted).
+    assert.equal(balance(), 0, "free own-key resolution debits nothing");
   } finally {
     process.env.AI_PROVIDER = prevProvider;
     process.env.AI_API_KEY = prevKey;
@@ -91,7 +93,7 @@ test("H2: without an API key, resolveProvider falls back to heuristic", async ()
   const prevKey = process.env.AI_API_KEY;
   delete process.env.AI_API_KEY;
   try {
-    const { provider, usedAi } = await resolveProvider("ai_cv_tailoring", "ai_tailor", "1");
+    const { provider, usedAi } = await resolveProvider("ai_cv_tailoring");
     assert.equal(usedAi, false);
     assert.equal(provider.name, "mock");
   } finally {

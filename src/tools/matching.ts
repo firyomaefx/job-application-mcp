@@ -5,7 +5,8 @@ import { getCv, getJob, saveApplication } from "../store/applications.js";
 import { extractKeywords, scoreMatch } from "../lib/scoring.js";
 import { getProvider, type AiContext, type AiProvider } from "../ai/provider.js";
 import { resolveAiMode } from "../features.js";
-import { tryDebit } from "../licence/credits.js";
+import { runAiOp } from "../ai/guard.js";
+import type { AiFeature } from "../ai/usage.js";
 
 /**
  * Resolve the AI provider for a tool call.
@@ -13,22 +14,20 @@ import { tryDebit } from "../licence/credits.js";
  * - A user who supplies their own API key (AI_API_KEY) gets the real provider,
  *   whether on the Free or Pro plan. This honours the free-core guarantee that
  *   users can use their own Claude/OpenAI key.
- * - The Pro *hosted* path additionally debits an AI credit (when a Pro
- *   entitlement + balance exist). Free users with their own key are never
- *   debited (no credits, no hosted quota).
+ * - `proHosted` is true only on the Pro hosted path (Pro entitlement + balance).
+ *   The actual credit debit happens in `runAiOp` ON SUCCESS — never on fallback
+ *   or failure. Free users with their own key are never debited.
  * - With no key, fall back to the local heuristic (mock) provider.
  */
 export async function resolveProvider(
   feature: string,
-  reason: "ai_tailor" | "ai_cover" | "ai_answer",
-  ref: string,
-): Promise<{ provider: AiProvider; usedAi: boolean; debited: boolean }> {
+): Promise<{ provider: AiProvider; usedAi: boolean; proHosted: boolean }> {
   const haveKey = !!process.env.AI_API_KEY;
   const mode = resolveAiMode(feature); // 'ai' only when Pro entitlement + balance
   const usedAi = haveKey;
-  const debited = mode === "ai" && haveKey && tryDebit(reason, ref);
+  const proHosted = mode === "ai" && haveKey;
   const provider = await getProvider({ useReal: usedAi });
-  return { provider, usedAi, debited };
+  return { provider, usedAi, proHosted };
 }
 
 function buildContext(job: { title: string; description: string; keywords: string[] }, cvText: string, question?: string): AiContext {
@@ -112,12 +111,15 @@ export const tailorCvTool: ToolDef<typeof tailorCvSchema> = {
     const cv = getCv(input.cv_id);
     if (!cv) return { summary: `CV ${input.cv_id} not found.` };
 
-    const { provider, usedAi, debited } = await resolveProvider("ai_cv_tailoring", "ai_tailor", String(input.job_id));
-    const result = await provider.tailorCv(buildContext(job, cv.text));
+    const { provider, usedAi, proHosted } = await resolveProvider("ai_cv_tailoring");
+    const ctx = buildContext(job, cv.text);
+    const { result, debited, status } = await runAiOp(
+      "ai_cv_tailoring" as AiFeature, "ai_tailor", String(input.job_id), provider, usedAi, proHosted, ctx, "tailorCv",
+    );
 
     return {
-      summary: `Tailored CV draft for "${job.title}" (${usedAi ? "AI" : "heuristic"}, provider: ${provider.name}${debited ? ", 1 credit debited" : ""}).`,
-      data: { text: result.text, mode: usedAi ? "ai" : "heuristic" },
+      summary: `Tailored CV draft for "${job.title}" (${labelFor(usedAi, status, result.provider)}, provider: ${result.provider}${debited ? ", 1 credit debited" : ""}).`,
+      data: { text: result.text, mode: result.provider === "mock" ? "heuristic" : "ai", status, usage: result.usage, cost_usd: result.cost_usd },
       notes: result.notes,
     };
   },
@@ -141,12 +143,15 @@ export const coverLetterTool: ToolDef<typeof coverLetterSchema> = {
     const cv = getCv(input.cv_id);
     if (!cv) return { summary: `CV ${input.cv_id} not found.` };
 
-    const { provider, usedAi, debited } = await resolveProvider("ai_cover_letter", "ai_cover", String(input.job_id));
-    const result = await provider.coverLetter(buildContext(job, cv.text));
+    const { provider, usedAi, proHosted } = await resolveProvider("ai_cover_letter");
+    const ctx = buildContext(job, cv.text);
+    const { result, debited, status } = await runAiOp(
+      "ai_cover_letter" as AiFeature, "ai_cover", String(input.job_id), provider, usedAi, proHosted, ctx, "coverLetter",
+    );
 
     return {
-      summary: `Cover letter draft for "${job.title}" (${usedAi ? "AI" : "heuristic"}, provider: ${provider.name}${debited ? ", 1 credit debited" : ""}).`,
-      data: { text: result.text, mode: usedAi ? "ai" : "heuristic" },
+      summary: `Cover letter draft for "${job.title}" (${labelFor(usedAi, status, result.provider)}, provider: ${result.provider}${debited ? ", 1 credit debited" : ""}).`,
+      data: { text: result.text, mode: result.provider === "mock" ? "heuristic" : "ai", status, usage: result.usage, cost_usd: result.cost_usd },
       notes: result.notes,
     };
   },
@@ -171,13 +176,23 @@ export const draftAnswerTool: ToolDef<typeof draftAnswerSchema> = {
     const cvText = cv?.text ?? "";
     const ctxJob = job ?? { title: "the role", description: "", keywords: [] as string[] };
 
-    const { provider, usedAi, debited } = await resolveProvider("ai_answer", "ai_answer", String(input.job_id ?? ""));
-    const result = await provider.draftAnswer(buildContext(ctxJob, cvText, input.question));
+    const { provider, usedAi, proHosted } = await resolveProvider("ai_answer");
+    const ctx = buildContext(ctxJob, cvText, input.question);
+    const { result, debited, status } = await runAiOp(
+      "ai_answer" as AiFeature, "ai_answer", String(input.job_id ?? ""), provider, usedAi, proHosted, ctx, "draftAnswer",
+    );
 
     return {
-      summary: `Drafted answer (${usedAi ? "AI" : "heuristic"}, provider: ${provider.name}${debited ? ", 1 credit debited" : ""}).`,
-      data: { question: input.question, text: result.text, mode: usedAi ? "ai" : "heuristic" },
+      summary: `Drafted answer (${labelFor(usedAi, status, result.provider)}, provider: ${result.provider}${debited ? ", 1 credit debited" : ""}).`,
+      data: { question: input.question, text: result.text, mode: result.provider === "mock" ? "heuristic" : "ai", status, usage: result.usage, cost_usd: result.cost_usd },
       notes: result.notes,
     };
   },
 };
+
+/** Human label: 'AI', 'heuristic', or 'AI→heuristic fallback'. */
+function labelFor(usedAi: boolean, status: string, providerName: string): string {
+  if (!usedAi) return "heuristic";
+  if (status === "fallback" || providerName === "mock") return "AI→heuristic fallback";
+  return "AI";
+}

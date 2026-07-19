@@ -17,10 +17,19 @@ export interface AiContext {
   question?: string;
 }
 
+export interface AiUsage {
+  input_tokens: number;
+  output_tokens: number;
+}
+
 export interface AiResult {
   text: string;
   provider: string;
   notes: string[];
+  /** Token usage when known (real providers). Mock estimates deterministically. */
+  usage?: AiUsage;
+  /** Estimated cost in USD for this call (0 for the local mock). */
+  cost_usd?: number;
 }
 
 export interface AiProvider {
