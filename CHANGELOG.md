@@ -6,6 +6,8 @@ breaking changes may bump the minor version.
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-07-20
+
 ### Added
 - Stage 2 Pro seams: AI provider abstraction (`src/ai/`), licence/entitlement
   module (`src/licence/`), credit ledger, feature gating (`src/features.ts`),
@@ -14,6 +16,15 @@ breaking changes may bump the minor version.
 - Stage 3 wire-ready: static marketing site (`website/`), credit top-up module,
   payment-webhook seam (env-gated, not live).
 - Stage 4 wire-ready: multi-candidate/business DB schema + admin tools.
+- Release workflow: GitHub Actions `release.yml` builds the core + Chrome
+  extension zip and per-OS desktop installers (AppImage / NSIS / DMG) on tag.
+
+### Fixed
+- `@types/pdf-parse` added so `tsc` typecheck passes on a clean install (local
+  resolution was masked by a parent pnpm store).
+- Require Node ≥ 22 (the `node:sqlite` DB needs it); CI matrix now 22/24.
+- Use valid electron-builder 25 CLI flags (`--linux/--win/--mac <target>`) so
+  desktop installers actually build instead of printing help and exiting.
 
 ## [0.1.0] — 2026-07-20
 
