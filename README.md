@@ -9,7 +9,7 @@ Analyse jobs · Match against your CV · Tailor documents · Preview forms · Tr
 **all on your machine, nothing uploaded, submission stays in your hands.**
 
 [![License: AGPL-3.0-or-later](https://img.shields.io/badge/License-AGPL--3.0--or--later-blue.svg)](./LICENSE)
-[![Node](https://img.shields.io/badge/node-%E2%89%A520-green.svg)](https://nodejs.org)
+[![Node](https://img.shields.io/badge/node-%E2%89%A522-green.svg)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6.svg)](https://www.typescriptlang.org/)
 [![Status: Alpha](https://img.shields.io/badge/status-alpha-orange.svg)](#status)
 
@@ -110,7 +110,7 @@ operates on data you provide and store locally.
 
 ### Requirements
 
-- **Node.js ≥ 20** (uses the built-in `node:sqlite` — no native compilation needed)
+- **Node.js ≥ 22** (uses the built-in `node:sqlite` — no native compilation needed)
 - npm
 
 ### Install & build
