@@ -133,12 +133,56 @@ function migrate(db: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_members_account ON team_members(account_id);
   `);
 
+  // ── schema v3: approval tokens, entitlement events, AI usage ──────────
+  // Added in the audit/mvp-hardening cycle for:
+  //  - approval-gated submission recording (N5)
+  //  - entitlement-activity log (N7)
+  //  - Claude cost/token accounting (N2/N3)
+  // All additive (CREATE IF NOT EXISTS) → backward-compatible, no data loss.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS approval_tokens (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      profile_id     INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+      application_id INTEGER NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+      token          TEXT NOT NULL,
+      created_at     TEXT NOT NULL,
+      expires_at     TEXT NOT NULL,
+      used_at        TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_tokens_app ON approval_tokens(application_id);
+    CREATE INDEX IF NOT EXISTS idx_tokens_profile ON approval_tokens(profile_id);
+
+    CREATE TABLE IF NOT EXISTS entitlement_events (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      profile_id  INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+      event       TEXT NOT NULL,          -- 'activate'|'grant'|'expire'|'downgrade'|'clear'
+      plan        TEXT,
+      detail      TEXT,
+      created_at  TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_entevents_profile ON entitlement_events(profile_id);
+
+    CREATE TABLE IF NOT EXISTS ai_usage (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      profile_id     INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+      feature        TEXT NOT NULL,        -- 'ai_cv_tailoring'|'ai_cover_letter'|'ai_answer'
+      provider       TEXT NOT NULL,        -- 'mock'|'openai'|'anthropic'
+      input_tokens   INTEGER NOT NULL DEFAULT 0,
+      output_tokens  INTEGER NOT NULL DEFAULT 0,
+      cost_usd       REAL NOT NULL DEFAULT 0,
+      status         TEXT NOT NULL,        -- 'ok'|'fallback'|'failed'
+      created_at     TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_aiusage_profile ON ai_usage(profile_id);
+    CREATE INDEX IF NOT EXISTS idx_aiusage_created ON ai_usage(created_at);
+  `);
+
   const row = db.prepare("SELECT value FROM meta WHERE key = ?").get("schema_version") as
     | { value: string }
     | undefined;
   const current = row ? Number(row.value) : 0;
-  if (current < 2) {
-    db.prepare("INSERT OR REPLACE INTO meta(key, value) VALUES (?, '2')").run("schema_version");
+  if (current < 3) {
+    db.prepare("INSERT OR REPLACE INTO meta(key, value) VALUES (?, '3')").run("schema_version");
   }
 }
 
@@ -154,6 +198,9 @@ export function closeDb(): void {
 export function resetDb(): void {
   const db = openDb();
   db.exec(`
+    DELETE FROM ai_usage;
+    DELETE FROM entitlement_events;
+    DELETE FROM approval_tokens;
     DELETE FROM team_members;
     DELETE FROM accounts;
     DELETE FROM credit_ledger;
