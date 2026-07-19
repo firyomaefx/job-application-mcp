@@ -38,10 +38,13 @@ Language: **TypeScript/Node (ESM, Node ≥ 22)**. Local DB: **`node:sqlite`**
 - `cli/cli.ts` — human CLI: `job-mcp serve | serve:http | --help`.
 - `extension/` — Chrome MV3 extension that captures form fields and sends them
   to the HTTP bridge for preview. Never submits.
-- `desktop/` — Electron wrapper that spawns the bridge and shows a dashboard.
-  Separate package with its own `package.json`. Dev preview: the packaged
-  installer does not bundle the bridge — it spawns `node ../dist/src/http.js`
-  and requires Node.js on PATH.
+- `desktop/` — Electron wrapper that forks the bridge and shows a dashboard.
+  Separate package with its own `package.json`. Standalone: the HTTP bridge is
+  esbuild-bundled into `desktop/bridge-bundle.mjs` (`npm run bundle:bridge`,
+  generated/gitignored) and forked from Electron's own Node via
+  `ELECTRON_RUN_AS_NODE=1`, so the packaged installer needs no system Node.js.
+  electron-builder ships the bundle as an `extraResource`; the release workflow
+  runs `bundle:bridge` before packaging.
 
 ## Conventions
 
@@ -60,6 +63,7 @@ Language: **TypeScript/Node (ESM, Node ≥ 22)**. Local DB: **`node:sqlite`**
 ## Commands
 
 - `npm run build` — compile to `dist/`
+- `npm run bundle:bridge` — esbuild-bundle the HTTP bridge into `desktop/bridge-bundle.mjs` (run after `build`; used by the desktop app)
 - `npm test` — run `node --test` suite via tsx
 - `npm run typecheck` — `tsc --noEmit`
 - `node dist/src/index.js` — start the stdio MCP server

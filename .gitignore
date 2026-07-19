@@ -5,6 +5,8 @@ node_modules/
 dist/
 *.tsbuildinfo
 desktop/release/
+# Generated bundled bridge (built by `npm run bundle:bridge` / CI before packaging)
+desktop/bridge-bundle.mjs
 
 # Local data (never commit user data)
 data/

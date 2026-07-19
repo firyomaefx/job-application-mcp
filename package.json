@@ -19,6 +19,7 @@
     "serve:http": "node dist/src/http.js",
     "test": "node --test --import tsx tests/*.test.ts",
     "typecheck": "tsc --noEmit",
+    "bundle:bridge": "esbuild dist/src/http.js --bundle --platform=node --format=esm --target=node22 --outfile=desktop/bridge-bundle.mjs",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
@@ -39,6 +40,7 @@
   "devDependencies": {
     "@types/node": "^22.9.0",
     "@types/pdf-parse": "^1.1.5",
+    "esbuild": "^0.25.0",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3"
   }

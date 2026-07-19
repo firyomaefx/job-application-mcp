@@ -75,6 +75,9 @@ jobs:
         run: |
           npm install --no-audit --no-fund
           npm run build
+          # Bundle the HTTP bridge into a single self-contained ESM file so the
+          # desktop installer ships with no system-Node dependency.
+          npm run bundle:bridge
 
       - name: Install desktop deps
         run: cd desktop && npm install --no-audit --no-fund

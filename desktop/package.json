@@ -19,6 +19,9 @@
     "appId": "io.github.jobapplicationmcp.desktop",
     "productName": "Job Application MCP",
     "files": ["main.js", "preload.js", "renderer/**/*"],
+    "extraResources": [
+      { "from": "bridge-bundle.mjs", "to": "bridge-bundle.mjs" }
+    ],
     "directories": { "output": "release" },
     "publish": {
       "provider": "github",
