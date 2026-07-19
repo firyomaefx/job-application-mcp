@@ -6,8 +6,8 @@ Local-first, open-source job application assistant built on the
 Model Context Protocol. Free community core; paid Pro/cloud services
 are out of scope for this repo (see `BUSINESS_PROPOSAL.md`).
 
-Language: **TypeScript/Node (ESM, Node ≥ 20)**. Local DB: **better-sqlite3**.
-MCP transport: **stdio**.
+Language: **TypeScript/Node (ESM, Node ≥ 20)**. Local DB: **`node:sqlite`**
+(`DatabaseSync`, built into Node — no native deps). MCP transport: **stdio**.
 
 ## Layout
 

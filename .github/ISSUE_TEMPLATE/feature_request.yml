@@ -1,0 +1,32 @@
+name: Feature request
+description: Suggest a feature for the free core (Pro/cloud features belong in Discussions)
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What job-hunting task does this make easier?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What should the tool do? Keep it local-first and no-submission.
+    validations:
+      required: true
+  - type: dropdown
+    id: tier
+    attributes:
+      label: Suggested tier
+      options:
+        - Free core (local only)
+        - Pro (cloud/AI — for discussion)
+        - Business
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

@@ -1,0 +1,130 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # Build the core (for a source tarball + sanity) and the Chrome extension zip.
+  build-core-and-extension:
+    name: Core + extension zip
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+      - run: npm test
+
+      - name: Generate extension icons
+        run: node extension/build-icons.js
+
+      - name: Zip extension
+        run: |
+          mkdir -p artifacts
+          cd extension && zip -r ../artifacts/job-application-mcp-extension.zip . \
+            -x "build-icons.js" && cd ..
+
+      - name: Zip core build
+        run: |
+          mkdir -p artifacts
+          zip -r artifacts/job-application-mcp-core-dist.zip dist src cli tests \
+            package.json package-lock.json README.md BUSINESS_PROPOSAL.md \
+            CLAUDE.md CHANGELOG.md LICENSE
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: core-and-extension
+          path: artifacts/*.zip
+
+  # Build desktop installers per OS and upload to the release.
+  desktop:
+    name: Desktop installer (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: AppImage
+          - os: windows-latest
+            target: nsis
+          - os: macos-latest
+            target: dmg
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Build core (so the bridge exists for the desktop app)
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+
+      - name: Install desktop deps
+        run: cd desktop && npm install --no-audit --no-fund
+
+      - name: Build desktop installer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: cd desktop && npx electron-builder --${{ matrix.target }} --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.target }}
+          path: |
+            desktop/release/*.AppImage
+            desktop/release/*.exe
+            desktop/release/*.dmg
+            desktop/release/latest*.yml
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-core-and-extension, desktop]
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Flatten artifacts
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f \( -name "*.zip" -o -name "*.AppImage" -o -name "*.exe" -o -name "*.dmg" -o -name "*.yml" \) -exec cp {} release-assets/ \;
+          ls -l release-assets
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: release-assets/*
+          body: |
+            ## Job Application MCP ${{ github.ref_name }}
+
+            **This is alpha software.** Free community core only.
+
+            ### Downloads
+            - **Windows installer** — `*-Setup.exe` (runs the desktop app; requires Node.js on PATH for the bridge)
+            - **macOS** — `*.dmg`
+            - **Linux** — `*.AppImage`
+            - **Chrome extension** — `job-application-mcp-extension.zip` (load unpacked in `chrome://extensions`)
+            - **Core build** — `job-application-mcp-core-dist.zip` (for stdio MCP clients)
+
+            See the [README](https://github.com/firyomaefx/job-application-mcp#readme) for setup.
+            See [CHANGELOG.md](https://github.com/firyomaefx/job-application-mcp/blob/main/CHANGELOG.md) for changes.

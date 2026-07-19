@@ -1,0 +1,53 @@
+name: Bug report
+description: Report something broken in the free core, HTTP bridge, extension, or desktop app
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. The free core runs locally —
+        no data leaves your machine, so please avoid pasting full CVs or PII.
+  - type: input
+    id: component
+    attributes:
+      label: Component
+      placeholder: core / stdio server / HTTP bridge / Chrome extension / desktop app
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: e.g. 0.1.0 (or git SHA)
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node version
+      placeholder: e.g. 22.11.0
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Steps to reproduce, expected vs actual.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / output
+      description: Paste relevant output. Strip personal data first.
+      render: shell
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      options:
+        - Windows
+        - macOS
+        - Linux
+    validations:
+      required: true

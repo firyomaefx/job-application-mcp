@@ -3,6 +3,22 @@ import type { ToolDef } from "./types.js";
 import { getDefaultProfile } from "../store/profile.js";
 import { getCv, getJob, saveApplication } from "../store/applications.js";
 import { extractKeywords, scoreMatch } from "../lib/scoring.js";
+import { getProvider, type AiContext } from "../ai/provider.js";
+import { resolveAiMode } from "../features.js";
+import { tryDebit } from "../licence/credits.js";
+
+function buildContext(job: { title: string; description: string; keywords: string[] }, cvText: string, question?: string): AiContext {
+  const profile = getDefaultProfile();
+  const cvSkills = extractKeywords(cvText, 30);
+  return {
+    jobTitle: job.title,
+    jobDescription: job.description,
+    jobKeywords: job.keywords,
+    cvText,
+    candidateSkills: Array.from(new Set([...profile.skills, ...cvSkills])),
+    question,
+  };
+}
 
 const matchCvSchema = z.object({
   job_id: z.number().int(),
@@ -16,13 +32,12 @@ export const matchCvTool: ToolDef<typeof matchCvSchema> = {
     "Score a stored CV against a stored job (0-100) and list matched / missing skills. " +
     "Optionally create a draft application record with the score.",
   inputSchema: matchCvSchema,
-  run: (input) => {
+  run: async (input) => {
     const job = getJob(input.job_id);
     if (!job) return { summary: `Job ${input.job_id} not found.` };
     const cv = getCv(input.cv_id);
     if (!cv) return { summary: `CV ${input.cv_id} not found.` };
 
-    // Combine the profile's curated skills with skills detected in the CV text.
     const profile = getDefaultProfile();
     const cvSkills = extractKeywords(cv.text, 30);
     const candidateSkills = Array.from(new Set([...profile.skills, ...cvSkills]));
@@ -63,51 +78,54 @@ const tailorCvSchema = z.object({
 export const tailorCvTool: ToolDef<typeof tailorCvSchema> = {
   name: "tailor_cv",
   description:
-    "Produce basic, local CV-tailoring suggestions: which skills to surface, which to add, " +
-    "and where the CV undersells the job. Free core (heuristic). Pro adds AI rewriting.",
+    "Tailor a CV toward a job. Free core: heuristic structural draft (local). " +
+    "Pro (with AI provider + credits): AI-rewritten prose. One AI credit debited on the Pro path.",
   inputSchema: tailorCvSchema,
-  run: (input) => {
+  run: async (input) => {
     const job = getJob(input.job_id);
     if (!job) return { summary: `Job ${input.job_id} not found.` };
     const cv = getCv(input.cv_id);
     if (!cv) return { summary: `CV ${input.cv_id} not found.` };
 
-    const cvSkills = new Set(extractKeywords(cv.text, 40).map((s) => s.toLowerCase()));
-    const surface: string[] = [];
-    const missing: string[] = [];
-    for (const kw of job.keywords) {
-      if (cvSkills.has(kw.toLowerCase())) surface.push(kw);
-      else missing.push(kw);
-    }
-
-    const profile = getDefaultProfile();
-    const profileHas = new Set(profile.skills.map((s) => s.toLowerCase()));
-    const mentionable = missing.filter((m) => profileHas.has(m.toLowerCase()));
-
-    const suggestions: string[] = [];
-    if (surface.length > 0) {
-      suggestions.push(
-        `Move these matched skills higher in the CV: ${surface.slice(0, 10).join(", ")}.`
-      );
-    }
-    if (mentionable.length > 0) {
-      suggestions.push(
-        `You have these in your profile but not this CV — add them: ${mentionable.slice(0, 10).join(", ")}.`
-      );
-    }
-    if (missing.length > mentionable.length) {
-      const gaps = missing.filter((m) => !mentionable.includes(m));
-      suggestions.push(
-        `Genuine gaps to address (or de-emphasize): ${gaps.slice(0, 8).join(", ")}.`
-      );
-    }
+    const mode = resolveAiMode("ai_cv_tailoring");
+    const usedAi = mode === "ai" && tryDebit("ai_tailor", String(input.job_id));
+    const provider = await getProvider({ useReal: usedAi });
+    const result = await provider.tailorCv(buildContext(job, cv.text));
 
     return {
-      summary: `${suggestions.length} tailoring suggestion(s) for "${job.title}".`,
-      data: { surface, missing, mentionable, suggestions },
-      notes: [
-        "Free core gives structural suggestions only. AI rewriting is a Pro feature.",
-      ],
+      summary: `Tailored CV draft for "${job.title}" (${usedAi ? "AI" : "heuristic"}, provider: ${provider.name}).`,
+      data: { text: result.text, mode: usedAi ? "ai" : "heuristic" },
+      notes: result.notes,
+    };
+  },
+};
+
+const coverLetterSchema = z.object({
+  job_id: z.number().int(),
+  cv_id: z.number().int(),
+});
+
+export const coverLetterTool: ToolDef<typeof coverLetterSchema> = {
+  name: "cover_letter",
+  description:
+    "Draft a cover letter for a job. Free core: heuristic scaffold (local). " +
+    "Pro (with AI provider + credits): full AI-drafted prose. One AI credit debited on the Pro path.",
+  inputSchema: coverLetterSchema,
+  run: async (input) => {
+    const job = getJob(input.job_id);
+    if (!job) return { summary: `Job ${input.job_id} not found.` };
+    const cv = getCv(input.cv_id);
+    if (!cv) return { summary: `CV ${input.cv_id} not found.` };
+
+    const mode = resolveAiMode("ai_cover_letter");
+    const usedAi = mode === "ai" && tryDebit("ai_cover", String(input.job_id));
+    const provider = await getProvider({ useReal: usedAi });
+    const result = await provider.coverLetter(buildContext(job, cv.text));
+
+    return {
+      summary: `Cover letter draft for "${job.title}" (${usedAi ? "AI" : "heuristic"}, provider: ${provider.name}).`,
+      data: { text: result.text, mode: usedAi ? "ai" : "heuristic" },
+      notes: result.notes,
     };
   },
 };
@@ -115,45 +133,31 @@ export const tailorCvTool: ToolDef<typeof tailorCvSchema> = {
 const draftAnswerSchema = z.object({
   question: z.string().min(5),
   cv_id: z.number().int().optional(),
-  profile_summary: z.string().optional(),
+  job_id: z.number().int().optional(),
 });
 
 export const draftAnswerTool: ToolDef<typeof draftAnswerSchema> = {
   name: "draft_answer",
   description:
-    "Draft a basic screening-answer starter from the candidate profile + CV. Free core: a " +
-    "structured template the user must review and rewrite. Not a finished answer.",
+    "Draft a screening-answer starter. Free core: heuristic template (local). " +
+    "Pro (with AI provider + credits): AI-drafted answer from verified CV facts. " +
+    "Always review before use; one AI credit debited on the Pro path.",
   inputSchema: draftAnswerSchema,
-  run: (input) => {
-    const profile = getDefaultProfile();
-    let cvText = "";
-    if (input.cv_id) {
-      const cv = getCv(input.cv_id);
-      if (cv) cvText = cv.text;
-    }
-    const skills = profile.skills.length > 0 ? profile.skills : extractKeywords(cvText, 10);
+  run: async (input) => {
+    const cv = input.cv_id ? getCv(input.cv_id) : null;
+    const job = input.job_id ? getJob(input.job_id) : null;
+    const cvText = cv?.text ?? "";
+    const ctxJob = job ?? { title: "the role", description: "", keywords: [] as string[] };
 
-    const draft =
-      `[Draft — review and rewrite before use]\n\n` +
-      `Question: ${input.question}\n\n` +
-      `Suggested opening: I'm ${profile.full_name}${
-        profile.headline ? `, ${profile.headline}` : ""
-      }. ` +
-      `My background centers on ${skills.slice(0, 5).join(", ")}.\n\n` +
-      `Talking points to develop:\n` +
-      `- Directly answer the question with one concrete example.\n` +
-      `- Tie back to: ${skills.slice(0, 3).join(", ")}.\n` +
-      `- Quantify an outcome (number, %, timeline).\n` +
-      `- Close with why this role fits.\n\n` +
-      `Relevant material from CV: ${cvText.slice(0, 500) || "(none provided)"}`;
+    const mode = resolveAiMode("ai_answer");
+    const usedAi = mode === "ai" && tryDebit("ai_answer", String(input.job_id ?? ""));
+    const provider = await getProvider({ useReal: usedAi });
+    const result = await provider.draftAnswer(buildContext(ctxJob, cvText, input.question));
 
     return {
-      summary: "Drafted a starter answer for review.",
-      data: { question: input.question, draft },
-      notes: [
-        "This is a template, not a finished answer. Verify every claim against your CV.",
-        "AI-drafted, polished answers are a Pro feature.",
-      ],
+      summary: `Drafted answer (${usedAi ? "AI" : "heuristic"}, provider: ${provider.name}).`,
+      data: { question: input.question, text: result.text, mode: usedAi ? "ai" : "heuristic" },
+      notes: result.notes,
     };
   },
 };

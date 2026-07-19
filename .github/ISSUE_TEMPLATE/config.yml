@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Q&A and Pro/cloud discussion
+    url: https://github.com/firyomaefx/job-application-mcp/discussions
+    about: Questions, ideas, and Pro/cloud feature discussion go in Discussions.
