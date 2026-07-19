@@ -41,7 +41,16 @@ fully local, and every MVP-excluded capability is **absent**.
 - Tool descriptions explicitly state submission is user-approved only.
 - Chrome extension popup shows a preview and requires the user to act; it
   does not auto-submit.
-- **Gate: PASS** — submission never occurs without approval.
+- **Cycle 2 (N5):** submission *recording* is now gated end-to-end.
+  `request_approval` runs a validation gate (valid app id · approved CV · not
+  already submitted · no duplicate for the same job · no unresolved sensitive
+  field) and issues a short-lived (10-min) single-use `randomBytes(24)` token.
+  `confirm_submission` consumes the token via constant-time `safeEqual`,
+  re-runs the gate, and marks the application submitted. **No browser
+  submission is ever performed** — the tool only records a user-performed
+  submission. Tests: `approval.test.ts` (8) + `workflow.test.ts`.
+- **Gate: PASS** — submission never occurs without approval, and a submission
+  cannot be recorded without a valid, unused, unexpired approval token.
 
 ## 4. Privacy acceptance
 
@@ -59,3 +68,23 @@ fully local, and every MVP-excluded capability is **absent**.
 
 The v0.1.2 free core satisfies every MVP acceptance criterion and excludes
 every capability the MVP gates forbid. **MVP ACCEPTED.**
+
+---
+
+## 6. Cycle 2 hardening acceptance (2026-07-20, branch `audit/mvp-hardening`)
+
+| # | Criterion | Method | Result |
+|---|-----------|--------|--------|
+| B1 | No prompt-injection escape from job/CV content | `ai-cost.test.ts` N1 (wrapper, tag-strip, no escape) | ✅ |
+| B2 | AI usage + cost measured; mock = 0 cost | `ai-cost.test.ts` N2 | ✅ |
+| B3 | Monthly spend cap + retry + rate limit enforced | `ai-cost.test.ts` N3 | ✅ |
+| B4 | Paid-AI failure → heuristic fallback, no debit, workflow continues | `ai-cost.test.ts` N4 | ✅ |
+| B5 | Submission recording requires valid + unused + unexpired single-use token + full validation gate | `approval.test.ts` + `workflow.test.ts` | ✅ |
+| B6 | Local backup/restore works; restore makes a safety snapshot first | `backup.test.ts` | ✅ |
+| B7 | Entitlement lifecycle logged; data preserved across upgrade/downgrade/expiry | `licence-lifecycle.test.ts` | ✅ |
+| B8 | Form-field classification is pure + testable; extension aligned | `forms.test.ts` | ✅ |
+| B9 | Desktop app is standalone (bundled bridge, no system Node) | bridge bundle smoke: /health, get_profile, parse_cv | ✅ |
+| B10 | No real job submission during automated testing | all submission tests use the recording-only path; no browser/DOM submission | ✅ |
+
+**Cycle 2 acceptance: PASS (10/10).** No Critical or High finding remains open.
+MVP exclusions remain honoured (X1–X6 unchanged).

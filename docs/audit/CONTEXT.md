@@ -2,20 +2,24 @@
 
 > Written only during the Reflect phase per audit rule 7. Contains **no
 > secrets, tokens, API keys, or PII** (rule 8). A continuity brief for anyone
-> (human or agent) picking up this project after the v0.1.2 audit.
+> (human or agent) picking up this project after the v0.1.2 audit and the
+> Cycle-2 hardening pass.
 
 ## 1. Where the project stands
 
-- **Repo:** `firyomaefx/job-application-mcp`, branch `main`.
-- **Current release:** `v0.1.2` (commit `24ca9d9`), published as a GitHub
-  Release with 8 assets (core zip, extension zip, Windows NSIS exe, Linux
-  AppImage, macOS DMG, 3 auto-update manifests).
+- **Repo:** `firyomaefx/job-application-mcp`. `main` = v0.1.2 (released).
+  Cycle-2 hardening is on branch **`audit/mvp-hardening`** (unreleased;
+  awaiting authorization to merge + cut a fresh tag).
+- **Current release (on main):** `v0.1.2` (commit `24ca9d9`), published as a
+  GitHub Release with 8 assets. v0.1.0/v0.1.1 release runs were red; v0.1.2 is
+  the first green one.
   URL: https://github.com/firyomaefx/job-application-mcp/releases/tag/v0.1.2
 - **Release strategy (decided by product owner):** non-destructive re-release.
   Cut **fresh** version tags. **Never** force-push or rewrite existing remote
-  tags. v0.1.0/v0.1.1 release runs were red; v0.1.2 is the first green one.
-- **Audit:** complete. 11 deliverables in `audit/`. Final decision: **GO**
-  (see `audit/RELEASE_READINESS.md`).
+  tags.
+- **Audit:** Cycle 1 (v0.1.2) = GO, shipped. Cycle 2 (hardening) = ready to
+  merge, **not shipped** (no publish/deploy without explicit authorization).
+  Deliverables in `docs/audit/`. See `docs/audit/RELEASE_READINESS.md` §6.
 
 ## 2. What the system is
 
@@ -24,28 +28,54 @@ on the Model Context Protocol. TypeScript/Node ESM, Node ≥ 22, `node:sqlite`
 (built-in, no native deps). Free community core in this repo; paid Pro/cloud
 services are **deferred seams** — not built yet.
 
-- stdio MCP server (23 tools) + local HTTP bridge (127.0.0.1) sharing the
-  same tools.
+- stdio MCP server (**28 tools** after Cycle 2) + local HTTP bridge
+  (127.0.0.1) sharing the same tools.
 - CV parse (PDF/DOCX/TXT), heuristic keyword + 0–100 match scoring,
-  tailor/cover-letter/draft-answer (own AI key or heuristic mock),
-  application CRUD + analytics, autofill **preview** (never submits).
-- Licence/entitlement + credit ledger + offline grace (seams), payment
-  webhook seam (server-side only, not live), Supabase sync seam (local no-op).
-- Chrome MV3 extension (form capture → preview), Electron desktop wrapper
-  (developer preview).
+  tailor/cover-letter/draft-answer (own AI key or heuristic mock) with
+  **prompt-injection hardening + cost controls** (Cycle 2),
+  application CRUD + analytics, autofill **preview** (never submits) +
+  **approval-gated submission recording** (Cycle 2: single-use 10-min token).
+- Licence/entitlement + credit ledger + offline grace (seams) +
+  **entitlement-activity log** (Cycle 2); payment webhook seam (server-side
+  only, not live); Supabase sync seam (local no-op); **local backup/restore**
+  (Cycle 2).
+- Chrome MV3 extension (form capture → preview), Electron desktop wrapper —
+  **standalone as of Cycle 2** (bundled bridge, no system Node).
 
-## 3. What the audit changed (v0.1.2)
+## 3. What the audits changed
 
+### Cycle 1 (v0.1.2, shipped)
 Fixed (with tests/CI): C1 desktop build, H1 entitlement MAC, H2 free-user
 own-key AI, H4 bridge CORS/auth/import-guard, M1 parse_cv path scoping, M2
 grantMonthly idempotency, H3/M6/L10 docs, L1 constant-time, L5 dup-salary,
-L7 smoke. Versions bumped to 0.1.2 across `package.json`, `desktop/package.json`,
-`extension/manifest.json`, `src/server.ts`. 12 new tests in
-`tests/audit-fixes.test.ts` (suite now 40).
+L7 smoke. Suite 40.
 
-Accepted/deferred (with rationale): M3 ungated admin credit tools, M4
-server-side paid enforcement, M7 desktop standalone non-functional, L2/L3/L4
-desktop+extension hardening, L6 pdf-parse, L8 tryDebit race, L9 release token.
+### Cycle 2 (hardening, branch `audit/mvp-hardening`, unreleased)
+Closed 8 new findings + M7, all with tests (suite 40 → **72**):
+- **N1** prompt injection → `src/ai/prompt.ts` (shared SYSTEM + `untrusted()`).
+- **N2–N4** Claude cost controls → `src/ai/usage.ts` + `src/ai/guard.ts`
+  (usage/cost, spend cap, retry/rate, graceful fallback; debit only on
+  success). `ai_usage` table (schema v3).
+- **N5** approval-gated submission → `src/submission/approval.ts` +
+  `src/tools/submission.ts` (`request_approval`/`confirm_submission`;
+  `approval_tokens` table, schema v3).
+- **N6** backup/restore → `src/store/backup.ts` + `src/tools/backup.ts`
+  (`backup_data`/`list_backups`/`restore_data`).
+- **N7** entitlement events → `src/licence/events.ts`
+  (`entitlement_events` table, schema v3); data preserved across up/down/expiry.
+- **N8** form classification → `src/forms/fields.ts` (pure; used by
+  `autofill_form`; extension aligned).
+- **M7** standalone desktop → `npm run bundle:bridge` (esbuild) →
+  `desktop/bridge-bundle.mjs`; `main.js` forks via `ELECTRON_RUN_AS_NODE` +
+  `process.execPath`; electron-builder `extraResource`; release.yml runs
+  `bundle:bridge` before packaging.
+
+Schema v3 (additive): `approval_tokens`, `entitlement_events`, `ai_usage`.
+Tool count 23 → 28. `esbuild` added as an explicit devDependency.
+
+Still accepted/deferred (unchanged): M3 ungated admin credit tools, M4
+server-side paid enforcement, L2/L3 desktop sandbox+DOM, L4 extension token
+storage, L6 pdf-parse, L8 tryDebit race, L9 release token.
 
 ## 4. Hard constraints that must persist
 
@@ -71,11 +101,13 @@ desktop+extension hardening, L6 pdf-parse, L8 tryDebit race, L9 release token.
 ```bash
 npm run typecheck   # 0 errors
 npm run build       # 0 errors
-npm test            # 40/40 pass
-JOB_MCP_DATA_DIR=./data-smoke node dist/src/index.js   # tools/list=23, status OK
+npm test            # 72/72 pass (Cycle 2)
+npm run bundle:bridge   # builds desktop/bridge-bundle.mjs (needed for desktop)
+JOB_MCP_DATA_DIR=./data-smoke node dist/src/index.js   # tools/list=28, status OK
 ```
-For a release: tag `v0.x.y` (fresh, no force), push, then
-`gh run watch <id> --exit-status` and require all 5 `release.yml` jobs green.
+For a release: bump versions, tag `v0.x.y` (fresh, no force), push, then
+`gh run watch <id> --exit-status` and require all 5 `release.yml` jobs green
+(the desktop job now runs `bundle:bridge` before packaging).
 
 ## 7. Conventions worth remembering
 
@@ -101,8 +133,9 @@ For a release: tag `v0.x.y` (fresh, no force), push, then
 
 ## 9. Audit artefacts
 
-`audit/AUDIT_CHARTER.md` · `audit/AUDIT_PLAN.md` ·
-`audit/REQUIREMENTS_TRACEABILITY.md` · `audit/RISK_REGISTER.md` ·
-`audit/SECURITY_AUDIT.md` · `audit/FREE_PAID_FEATURE_MATRIX.md` ·
-`audit/TEST_PLAN.md` · `audit/TEST_RESULTS.md` ·
-`audit/MVP_ACCEPTANCE.md` · `audit/RELEASE_READINESS.md` · this file.
+`docs/audit/AUDIT_CHARTER.md` · `docs/audit/AUDIT_PLAN.md` ·
+`docs/audit/AUDIT_FINDINGS.md` ·
+`docs/audit/REQUIREMENTS_TRACEABILITY.md` · `docs/audit/RISK_REGISTER.md` ·
+`docs/audit/SECURITY_AUDIT.md` · `docs/audit/FREE_PAID_FEATURE_MATRIX.md` ·
+`docs/audit/TEST_PLAN.md` · `docs/audit/TEST_RESULTS.md` ·
+`docs/audit/MVP_ACCEPTANCE.md` · `docs/audit/RELEASE_READINESS.md` · this file.

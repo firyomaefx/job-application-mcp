@@ -129,3 +129,59 @@ entitlements) are delivered. The desktop installer remains a labelled
 developer preview until D3.
 
 **Decision: GO.**
+
+---
+
+## 6. Cycle 2 — production-readiness hardening (2026-07-20, branch `audit/mvp-hardening`, UNRELEASED)
+
+A second `/goal` audit pass closed the remaining production-readiness gaps.
+Per the directive's change rules, **no publish/deploy occurred and nothing
+was pushed to `main`** — all work is committed on the dedicated
+`audit/mvp-hardening` branch and awaits explicit authorization to merge/release.
+
+### What changed
+- Closed 8 new findings (N1–N8) — 2 High (N1 prompt injection, N5 unguarded
+  submission), 6 Medium (N2–N4 cost controls, N6 backup/restore, N7
+  entitlement log, N8 form classification) — each with tests.
+- Closed M7: the desktop app is now **standalone** (esbuild-bundled bridge
+  forked from Electron's own Node via `ELECTRON_RUN_AS_NODE`; no system
+  Node.js required). release.yml runs `bundle:bridge` before packaging.
+- Tool count 23 → **28** (request_approval, confirm_submission, backup_data,
+  list_backups, restore_data). Suite 40 → **72** tests, all green.
+- typecheck clean, build clean.
+
+### Release-readiness status (Cycle 2)
+
+| Dimension | Status |
+|-----------|--------|
+| Open Critical | **0** |
+| Open High | **0** (N1, N5 closed) |
+| Free core | ✅ PASS (all 6 Free "Must"; own-key AI with cost cap + fallback) |
+| Paid / Pro | ⚠️ DEFERRED (unchanged — M4 server-side obligations, no paid value sold) |
+| Claude cost controls | ✅ PASS (N2–N4: usage/cost, spend cap, retry/rate, graceful fallback) |
+| Submission approval | ✅ PASS (N5: validation gate + single-use short-lived token; never submits) |
+| Backup / restore | ✅ PASS (N6; safety snapshot on restore) |
+| Licence lifecycle | ✅ PASS (N7: events + data preservation across up/down/expiry) |
+| Browser (extension) | ✅ PASS with deferred L4 |
+| Desktop (standalone) | ✅ PASS (M7 fixed); L2/L3 hardening still deferred |
+| Security (free-core) | ✅ PASS (N1 prompt injection closed) |
+
+### Cycle 2 decision: ✅ GO (to merge) — pending explicit authorization
+
+All release gates pass on the audit branch: no Critical, no High, no
+unauthorized submission, free workflow intact, Pro entitlement seam preserved,
+Claude cost controls in place, sensitive data protected, standalone installer
+builds, backup/restore works, 72/72 core tests pass, docs accurate. The work
+is **ready to merge and cut a fresh tag (e.g. v0.1.3)** when the product owner
+authorizes it. **No tag was cut and nothing was pushed to `main` or published.**
+
+### Required actions to ship Cycle 2
+| # | Action | Status |
+|---|--------|--------|
+| R7 | Review + merge `audit/mvp-hardening` into `main` | ⏳ awaiting authorization |
+| R8 | Cut a **fresh** `v0.1.3` tag (no force-push, no tag rewrite) | ⏳ awaiting authorization |
+| R9 | Bump version strings (`package.json`, `desktop/package.json`, `extension/manifest.json`, `src/server.ts`) | ⏳ do at release time |
+| R10 | `gh run watch <id> --exit-status`; require all 5 release.yml jobs green (now incl. `bundle:bridge`) | ⏳ at release time |
+
+> Per directive: "Do not publish or deploy without explicit user
+> authorization." Cycle 2 stops here, staged and verified, not shipped.

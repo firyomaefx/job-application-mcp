@@ -48,7 +48,7 @@ touched it. **RT** = requirement ID; **Impl** = implementation location;
 
 | RT | Requirement | Impl | Test | Finding |
 |----|-------------|------|------|---------|
-| S1 | Submission only with approval | `autofill_form` preview; tool descriptions | manual + grep | — |
+| S1 | Submission only with approval | `autofill_form` preview (no submit); `src/submission/approval.ts` validation gate + single-use 10-min `randomBytes(24)` token + constant-time `safeEqual`; `request_approval`/`confirm_submission` tools | `tests/approval.test.ts` (8); `tests/workflow.test.ts` | **N5** (gate + tokens added) |
 | S2 | HTTP bridge loopback-only | `src/http.ts` binds `127.0.0.1` | `tests/audit-fixes.test.ts` H4 | **H4** |
 | S3 | No payment secrets / AI keys in desktop | desktop spawns bridge via env; keys read server-side at call time | grep desktop/ | — |
 | S4 | No CV text / PII in logs | logging avoids CV payloads | grep `console.*cv` audit | — |
@@ -63,3 +63,23 @@ touched it. **RT** = requirement ID; **Impl** = implementation location;
   acceptable because no paid value is currently sold or gated.
 - All 6 MVP exclusions: **honoured** (none present).
 - All 7 security requirements: **met after fixes** (H1, H4, M1, L1).
+
+---
+
+## 6. Cycle 2 hardening traceability (2026-07-20, branch `audit/mvp-hardening`)
+
+| RT | Requirement | Impl | Test | Finding |
+|----|-------------|------|------|---------|
+| S8 | AI prompts treat job/CV content as untrusted (no instruction injection) | `src/ai/prompt.ts` SYSTEM + `untrusted()`; shared by `openai.ts`/`anthropic.ts` | `tests/ai-cost.test.ts` N1 (3) | **N1** |
+| S9 | AI spend is bounded (cap + retry + rate limit) | `src/ai/usage.ts` `canSpend`/`monthlyLimit`/`maxRetries`/`enforceRateLimit`; `ai_usage` table | `tests/ai-cost.test.ts` N3 (3) | **N3** |
+| S10 | AI usage + cost are measured | `src/ai/usage.ts` `estimateUsage`/`costFor`/`recordUsage`; `AiResult.usage`/`cost_usd` | `tests/ai-cost.test.ts` N2 (3) | **N2** |
+| S11 | Paid-AI failure never blocks the free workflow and never debits on failure | `src/ai/guard.ts` `runAiOp` (retry, debit only on success, heuristic fallback) | `tests/ai-cost.test.ts` N4 (2) | **N4** |
+| S12 | Submission recording requires valid app + approved CV + no duplicate + no unresolved sensitive + single-use short-lived token | `src/submission/approval.ts` | `tests/approval.test.ts` (8); `tests/workflow.test.ts` | **N5** |
+| S13 | Local backup/restore with a safety snapshot | `src/store/backup.ts`; `backup_data`/`list_backups`/`restore_data` tools | `tests/backup.test.ts` (2) | **N6** |
+| S14 | Entitlement lifecycle is auditable; data preserved across up/down/expiry | `src/licence/events.ts`; `entitlement_events` table; `entitlementWithGrace` | `tests/licence-lifecycle.test.ts` (6) | **N7** |
+| S15 | Form-field classification is pure + testable (sensitive detection, key guess) | `src/forms/fields.ts`; used by `autofill_form`; extension aligned | `tests/forms.test.ts` (4) | **N8** |
+| P8 | Desktop app runs with no system Node.js | `npm run bundle:bridge` → `desktop/bridge-bundle.mjs`; `main.js` forks via `ELECTRON_RUN_AS_NODE`+`process.execPath`; extraResource in electron-builder | bridge bundle smoke (health/call/parse_cv) | **M7** |
+
+**Cycle 2 summary:** 9 new requirement rows (S8–S15, P8) — all **met with
+tests**. S1 strengthened from "preview only" to a full approval-token gate.
+Open Critical: 0.

@@ -76,3 +76,27 @@ is unenforced because the hosted service does not exist. This is acceptable
 for a v0.1.x free-core release **only because no paid value is sold or
 gated**; it becomes a release-blocking Critical the moment a Pro tier is
 launched without the M4 obligations met.
+
+---
+
+## 6. Cycle 2 hardening additions (2026-07-20, branch `audit/mvp-hardening`)
+
+| Feature | Free (now) | Pro (future) | Enforcement | Audit ID |
+|---------|-----------|--------------|-------------|----------|
+| AI token usage + cost accounting | ✅ measured locally (own key) | ✅ server-side budget | `ai_usage` table; `costFor`/`recordUsage` | N2 |
+| AI monthly spend cap | ✅ env `JOB_MCP_AI_MONTHLY_LIMIT_USD` (default 20, 0=unlimited) | server-enforced | `canSpend` blocks over-cap calls | N3 |
+| AI retry + rate limit | ✅ env-tunable (`maxRetries`, min interval) | same | `enforceRateLimit` + backoff | N3 |
+| Graceful AI fallback (no debit on failure) | ✅ heuristic mock on failure/cap | credit debited only on success | `runAiOp` | N4 |
+| Prompt-injection hardening | ✅ untrusted-content wrapper | same | `src/ai/prompt.ts` shared by both providers | N1 |
+| Submission-approval gate (single-use token) | ✅ full (records only, never submits) | same | `approval_tokens` + `safeEqual` | N5 |
+| Local backup / restore | ✅ full (safety snapshot on restore) | managed backups = Pro server-side | `backup_data`/`list_backups`/`restore_data` | N6 |
+| Entitlement-activity log | ✅ local log (activate/renew/expire/downgrade) | server-side audit | `entitlement_events` | N7 |
+| Form-field classification (pure) | ✅ full | same | `src/forms/fields.ts` | N8 |
+| Standalone desktop (no system Node) | ✅ bundled bridge + Electron Node | same | `bridge-bundle.mjs` + `ELECTRON_RUN_AS_NODE` | M7 |
+
+These additions keep the free core fully local and never gate a free feature
+behind a paid call. The spend cap, retry, and fallback are **defensive**:
+they protect the user's own AI budget and keep the workflow usable when the
+paid-AI path is unavailable. The Pro hosted-Claude path still debits a credit
+only on a successful result and still must be server-enforced before launch
+(M4).
