@@ -6,10 +6,11 @@ const HELP = `job-application-mcp — local-first job application assistant (MCP
 
 Usage:
   job-mcp serve        Start the MCP server over stdio (for MCP clients).
+  job-mcp serve:http   Start the local HTTP bridge (127.0.0.1:8787 by default).
+                       Used by the Chrome extension and other non-stdio clients.
   job-mcp --help       Show this help.
 
-The free core runs entirely locally. Configure MCP clients (Claude Desktop,
-Claude Code, etc.) to launch this server, e.g.:
+Stdio MCP config (Claude Desktop / Claude Code):
 
   {
     "mcpServers": {
@@ -20,7 +21,10 @@ Claude Code, etc.) to launch this server, e.g.:
     }
   }
 
-Data is stored in JOB_MCP_DATA_DIR (default ./data).
+Environment:
+  JOB_MCP_DATA_DIR      Local data directory (default ./data)
+  JOB_MCP_HTTP_PORT     HTTP bridge port (default 8787)
+  JOB_MCP_HTTP_TOKEN    Optional bearer token for the HTTP bridge
 `;
 
 async function main(): Promise<void> {
@@ -33,6 +37,12 @@ async function main(): Promise<void> {
     const server = createServer();
     const transport = new StdioServerTransport();
     await server.connect(transport);
+    return;
+  }
+  if (arg === "serve:http") {
+    // Dynamically import the HTTP entrypoint; its top-level main() starts the
+    // loopback server in this same process.
+    await import("../src/http.js");
     return;
   }
   process.stderr.write(`Unknown command: ${arg}\n\n${HELP}`);

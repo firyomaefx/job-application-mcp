@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Job Application MCP</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Job Application MCP</h1>
+      <p class="tag">Form capture · preview only · nothing is submitted</p>
+    </header>
+
+    <section id="status" class="status" hidden>
+      <span id="status-dot" class="dot dot-off"></span>
+      <span id="status-text">Bridge: not checked</span>
+    </section>
+
+    <button id="capture" class="primary">Capture form fields on this page</button>
+
+    <section id="fields-section" hidden>
+      <h2>Captured fields (<span id="count">0</span>)</h2>
+      <ul id="fields"></ul>
+
+      <div class="row">
+        <label for="application-id">Application ID</label>
+        <input id="application-id" type="number" min="1" placeholder="e.g. 1" />
+      </div>
+
+      <button id="send" class="primary">Preview autofill via MCP</button>
+      <button id="copy" class="ghost">Copy JSON</button>
+    </section>
+
+    <section id="result" hidden>
+      <h2>Preview</h2>
+      <pre id="result-json"></pre>
+    </section>
+
+    <p id="error" class="error" hidden></p>
+
+    <footer>
+      <a id="options-link" href="#">Bridge settings</a>
+      <span class="hint">No fields are ever submitted automatically.</span>
+    </footer>
+
+    <script src="popup.js" type="module"></script>
+  </body>
+</html>

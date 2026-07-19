@@ -12,6 +12,8 @@ MCP transport: **stdio**.
 ## Layout
 
 - `src/index.ts` — MCP server entrypoint (stdio), wires tools into the SDK.
+- `src/http.ts` — local HTTP bridge entrypoint (127.0.0.1). Same tools as stdio,
+  for non-stdio clients (Chrome extension, desktop app). Part of the free core.
 - `src/server.ts` — server factory + tool registry.
 - `src/tools/` — one file per MCP tool. Each exports a `tool` definition
   (name, description, input schema) and a `handler` function.
@@ -19,7 +21,11 @@ MCP transport: **stdio**.
   `applications.ts` are CRUD).
 - `src/cv/parser.ts` — parse PDF/DOCX/TXT into plain text.
 - `src/lib/` — pure helpers (scoring, types). No I/O here.
-- `cli/cli.ts` — human CLI: `job-mcp <command>`.
+- `cli/cli.ts` — human CLI: `job-mcp serve | serve:http | --help`.
+- `extension/` — Chrome MV3 extension that captures form fields and sends them
+  to the HTTP bridge for preview. Never submits.
+- `desktop/` — Electron wrapper that spawns the bridge and shows a dashboard.
+  Separate package with its own `package.json`.
 
 ## Conventions
 
@@ -40,7 +46,10 @@ MCP transport: **stdio**.
 - `npm run build` — compile to `dist/`
 - `npm test` — run `node --test` suite via tsx
 - `npm run typecheck` — `tsc --noEmit`
-- `node dist/index.js` — start the stdio MCP server
+- `node dist/src/index.js` — start the stdio MCP server
+- `npm run serve:http` — start the local HTTP bridge (127.0.0.1:8787)
+- `cd extension && node build-icons.js` — regenerate extension icons
+- `cd desktop && npm start` — launch the Electron desktop app
 
 ## Testing
 

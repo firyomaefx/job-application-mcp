@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Job Application MCP — Form Capture",
+  "version": "0.1.0",
+  "description": "Capture form fields on a career page and preview autofill against your local Job Application MCP profile. Nothing is submitted.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["http://127.0.0.1/*", "http://localhost/*"],
+  "action": {
+    "default_title": "Job Application MCP",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "background/background.js",
+    "type": "module"
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": false
+  }
+}

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Job Application MCP — Bridge settings</title>
+    <link rel="stylesheet" href="../popup/popup.css" />
+    <style>
+      body { width: 420px; }
+      .row label { width: 110px; }
+      input[type="text"], input[type="password"] {
+        flex: 1;
+        padding: 6px 8px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        font: inherit;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Bridge settings</h1>
+      <p class="tag">Where the extension sends captured fields for preview</p>
+    </header>
+
+    <div class="row">
+      <label for="bridge-url">Bridge URL</label>
+      <input id="bridge-url" type="text" placeholder="http://127.0.0.1:8787" />
+    </div>
+    <div class="row">
+      <label for="token">Bearer token</label>
+      <input id="token" type="password" placeholder="(optional)" />
+    </div>
+
+    <p class="hint" style="margin:8px 0;">
+      Start the bridge locally with <code>npm run serve:http</code> in the
+      job-application-mcp project. Set <code>JOB_MCP_HTTP_TOKEN</code> if you
+      enabled token auth.
+    </p>
+
+    <button id="save" class="primary">Save</button>
+    <p id="saved" class="hint" hidden>Saved.</p>
+
+    <script src="options.js" type="module"></script>
+  </body>
+</html>

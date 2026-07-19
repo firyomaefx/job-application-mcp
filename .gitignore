@@ -4,6 +4,7 @@ node_modules/
 # Build
 dist/
 *.tsbuildinfo
+desktop/release/
 
 # Local data (never commit user data)
 data/

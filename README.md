@@ -29,6 +29,7 @@ Analyse jobs · Match against your CV · Tailor documents · Preview forms · Tr
 - [A full example flow](#a-full-example-flow)
 - [Configuration](#configuration)
 - [Project layout](#project-layout)
+- [Companion apps](#companion-apps)
 - [Develop](#develop)
 - [How matching works](#how-matching-works)
 - [Privacy & data](#privacy--data)
@@ -276,6 +277,7 @@ free core — see `.env.example`):
 job-application-mcp/
 ├── src/
 │   ├── index.ts           # stdio MCP server entrypoint
+│   ├── http.ts            # local HTTP bridge entrypoint (127.0.0.1)
 │   ├── server.ts          # server factory + tool registry
 │   ├── tools/             # one file per MCP tool
 │   │   ├── types.ts       # ToolDef / AnyTool / result helpers
@@ -292,12 +294,46 @@ job-application-mcp/
 │   └── lib/
 │       ├── types.ts       # domain types
 │       └── scoring.ts     # keyword extraction + match scoring (pure)
-├── cli/cli.ts             # human CLI: job-mcp serve | --help
+├── cli/cli.ts             # human CLI: job-mcp serve | serve:http | --help
+├── extension/             # Chrome MV3 extension (form capture → preview)
+├── desktop/               # Electron wrapper UI (launches the bridge)
+├── .github/workflows/ci.yml  # build + typecheck + test + stdio smoke
 ├── tests/                 # node:test suite
 ├── BUSINESS_PROPOSAL.md   # open-core + paid-service model
 ├── CLAUDE.md              # guide for Claude Code working in this repo
 └── LICENSE                # AGPL-3.0-or-later
 ```
+
+---
+
+## Companion apps
+
+The free core is the stdio MCP server above. Two optional companions live in this
+repo and talk to a **local HTTP bridge** (same tools, loopback only):
+
+### HTTP bridge
+
+```bash
+npm run serve:http      # 127.0.0.1:8787 by default
+```
+
+Endpoints: `GET /health`, `POST /call` with `{"name","arguments"}`. Optional
+bearer auth via `JOB_MCP_HTTP_TOKEN`. Source: [`src/http.ts`](./src/http.ts).
+
+### Chrome extension — `extension/`
+
+Captures form fields on a career page and asks the bridge to **preview** an
+autofill mapping. Never submits. Load it unpacked from `extension/`. See
+[`extension/README.md`](./extension/README.md).
+
+### Desktop app — `desktop/`
+
+An Electron wrapper that launches the bridge and shows a dashboard (status,
+profile, applications). Run with `cd desktop && npm install && npm start`. See
+[`desktop/README.md`](./desktop/README.md).
+
+> Both companions are **read/preview only** and reach only `127.0.0.1`. They
+> inherit the project's no-submission, no-LinkedIn/Indeed-automation rules.
 
 ---
 

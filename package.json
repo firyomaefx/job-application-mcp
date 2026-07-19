@@ -16,6 +16,7 @@
     "dev": "tsc --watch",
     "start": "node dist/cli/cli.js",
     "serve": "node dist/src/index.js",
+    "serve:http": "node dist/src/http.js",
     "test": "node --test --import tsx tests/*.test.ts",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build"

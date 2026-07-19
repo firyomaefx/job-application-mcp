@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src http://127.0.0.1:*;" />
+    <title>Job Application MCP</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <span class="logo">◆</span>
+        <div>
+          <h1>Job Application MCP</h1>
+          <p class="sub">Local-first · free core · nothing uploaded</p>
+        </div>
+      </div>
+      <div class="status" id="status">
+        <span class="dot" id="dot"></span>
+        <span id="status-text">Checking…</span>
+      </div>
+    </header>
+
+    <section class="controls">
+      <button id="refresh" class="primary">Refresh</button>
+      <button id="restart">Restart bridge</button>
+      <button id="open-data">Open data folder</button>
+    </section>
+
+    <section class="card">
+      <h2>Profile</h2>
+      <div id="profile" class="profile"><span class="muted">No profile yet.</span></div>
+    </section>
+
+    <section class="card">
+      <h2>Applications <span class="count" id="app-count"></span></h2>
+      <div class="table-wrap">
+        <table id="apps">
+          <thead>
+            <tr><th>ID</th><th>Job</th><th>Status</th><th>Match</th><th>Updated</th></tr>
+          </thead>
+          <tbody id="apps-body"><tr><td colspan="5" class="muted">No applications.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <p class="error" id="error" hidden></p>
+
+    <footer>
+      <span class="muted" id="bridge-url"></span>
+      <span class="muted">Submission stays manual — this UI only reads local data.</span>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>
