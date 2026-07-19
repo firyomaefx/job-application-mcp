@@ -9,7 +9,9 @@ import {
   updateStatusTool,
   autofillFormTool,
 } from "./application.js";
+import { requestApprovalTool, confirmSubmissionTool } from "./submission.js";
 import { analyticsTool, statusTool } from "./analytics.js";
+import { backupDataTool, listBackupsTool, restoreDataTool } from "./backup.js";
 import { topupCreditsTool, creditsTool, grantMonthlyTool } from "./pro.js";
 import {
   createAccountTool,
@@ -37,9 +39,15 @@ export const tools: AnyTool[] = [
   listApplicationsTool,
   updateStatusTool,
   autofillFormTool,
+  requestApprovalTool,
+  confirmSubmissionTool,
   // analytics + status
   analyticsTool,
   statusTool,
+  // backup / restore (local)
+  backupDataTool,
+  listBackupsTool,
+  restoreDataTool,
   // credits / pro
   creditsTool,
   topupCreditsTool,
