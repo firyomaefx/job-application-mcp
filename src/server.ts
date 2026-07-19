@@ -10,7 +10,7 @@ import { openDb } from "./store/db.js";
 
 const SERVER_INFO = {
   name: "job-application-mcp",
-  version: "0.1.0",
+  version: "0.1.2",
 } as const;
 
 /** Build the MCP server with all free-core tools registered. */

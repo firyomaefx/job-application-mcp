@@ -189,7 +189,6 @@ function isSensitive(f: { name: string; label?: string }): boolean {
   const s = `${f.name} ${f.label ?? ""}`.toLowerCase();
   return (
     s.includes("salary") ||
-    s.includes("salary") ||
     s.includes("authorized") ||
     s.includes("visa") ||
     s.includes("gender") ||

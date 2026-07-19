@@ -25,9 +25,61 @@ import {
 
 const DEVICE_FILE = "device-id";
 const ENT_FILE = "entitlement.json";
+const SECRET_FILE = "licence-secret";
 const OFFLINE_GRACE_DAYS = 14;
 
 let cachedDeviceId: string | null = null;
+let cachedSecret: string | null = null;
+
+/**
+ * A per-install signing secret, generated once and persisted under the data
+ * dir. It MACs the stored entitlement so a user casually editing
+ * entitlement.json to unlock Pro invalidates it (the read path falls back to
+ * FREE). NOTE: this is defense-in-depth, NOT a true enforcement boundary — a
+ * determined user with the source can recompute the MAC. Real Pro enforcement
+ * is server-side (signed entitlements verified with an embedded public key, and
+ * paid value hosted server-side). That is deferred until the hosted Pro service
+ * launches; today the release ships the free community core only.
+ */
+function licenceSecret(): string {
+  if (cachedSecret) return cachedSecret;
+  const dir = dataDir();
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  const path = join(dir, SECRET_FILE);
+  if (existsSync(path)) {
+    cachedSecret = readFileSync(path, "utf8").trim();
+    return cachedSecret;
+  }
+  cachedSecret = randomBytes(32).toString("hex");
+  writeFileSync(path, cachedSecret, "utf8");
+  return cachedSecret;
+}
+
+interface StoredEntitlement {
+  entitlement: Entitlement;
+  mac: string;
+}
+
+function withMac(ent: Entitlement): StoredEntitlement {
+  return { entitlement: ent, mac: hmacSign(licenceSecret(), JSON.stringify(ent)) };
+}
+
+/** Verify the MAC on a stored entitlement. Returns the entitlement or null. */
+function readEntitlementFile(): Entitlement | null {
+  const path = entitlementPath();
+  if (!existsSync(path)) return null;
+  try {
+    const raw = JSON.parse(readFileSync(path, "utf8"));
+    // Legacy unsigned format (pre-hardening) is rejected — safe default to FREE.
+    if (!raw || typeof raw !== "object" || !("mac" in raw) || !("entitlement" in raw)) return null;
+    const stored = raw as StoredEntitlement;
+    const expected = hmacSign(licenceSecret(), JSON.stringify(stored.entitlement));
+    if (!safeEqual(expected, stored.mac)) return null;
+    return stored.entitlement;
+  } catch {
+    return null;
+  }
+}
 
 /** A stable, random device id generated once and persisted. */
 export function deviceId(): string {
@@ -50,17 +102,12 @@ function entitlementPath(): string {
   return join(dataDir(), ENT_FILE);
 }
 
-/** Read the persisted entitlement, or FREE if none / invalid / expired. */
+/** Read the persisted entitlement, or FREE if none / tampered / expired. */
 export function currentEntitlement(now = new Date()): Entitlement {
-  const path = entitlementPath();
-  if (!existsSync(path)) return FREE_ENTITLEMENT;
-  try {
-    const raw = JSON.parse(readFileSync(path, "utf8")) as Entitlement;
-    if (!isActive(raw, now)) return FREE_ENTITLEMENT;
-    return raw;
-  } catch {
-    return FREE_ENTITLEMENT;
-  }
+  const ent = readEntitlementFile();
+  if (!ent) return FREE_ENTITLEMENT;
+  if (!isActive(ent, now)) return FREE_ENTITLEMENT;
+  return ent;
 }
 
 /**
@@ -87,17 +134,18 @@ export function mintToken(ent: Entitlement, secret: string): string {
   return `${b64url(payload)}.${hmacSign(secret, payload)}`;
 }
 
-/** Persist an entitlement as the active one. */
+/** Persist an entitlement as the active one (MAC-signed for integrity). */
 export function storeEntitlement(ent: Entitlement): void {
   const dir = dataDir();
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  writeFileSync(entitlementPath(), JSON.stringify(ent, null, 2), "utf8");
+  writeFileSync(entitlementPath(), JSON.stringify(withMac(ent), null, 2), "utf8");
 }
 
 /** Clear the stored entitlement (return to free). */
 export function clearEntitlement(): void {
-  const path = entitlementPath();
-  if (existsSync(path)) writeFileSync(path, JSON.stringify(FREE_ENTITLEMENT, null, 2), "utf8");
+  const dir = dataDir();
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  writeFileSync(entitlementPath(), JSON.stringify(withMac(FREE_ENTITLEMENT), null, 2), "utf8");
 }
 
 /**
@@ -140,20 +188,15 @@ export async function activate(opts: {
  * OFFLINE_GRACE_DAYS, allow continued use. Returns the ent or FREE.
  */
 export function entitlementWithGrace(now = new Date()): Entitlement {
-  const path = entitlementPath();
-  if (!existsSync(path)) return FREE_ENTITLEMENT;
-  try {
-    const raw = JSON.parse(readFileSync(path, "utf8")) as Entitlement;
-    if (isActive(raw, now)) return raw;
-    if (raw.expires_at) {
-      const expiry = new Date(raw.expires_at).getTime();
-      const graceEnd = expiry + OFFLINE_GRACE_DAYS * 86_400_000;
-      if (now.getTime() < graceEnd) return raw;
-    }
-    return FREE_ENTITLEMENT;
-  } catch {
-    return FREE_ENTITLEMENT;
+  const raw = readEntitlementFile();
+  if (!raw) return FREE_ENTITLEMENT;
+  if (isActive(raw, now)) return raw;
+  if (raw.expires_at) {
+    const expiry = new Date(raw.expires_at).getTime();
+    const graceEnd = expiry + OFFLINE_GRACE_DAYS * 86_400_000;
+    if (now.getTime() < graceEnd) return raw;
   }
+  return FREE_ENTITLEMENT;
 }
 
 /** Build an entitlement for a plan (server-side helper, also used in tests). */

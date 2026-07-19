@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Job Application MCP — Form Capture",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Capture form fields on a career page and preview autofill against your local Job Application MCP profile. Nothing is submitted.",
   "permissions": ["activeTab", "scripting", "storage"],
   "host_permissions": ["http://127.0.0.1/*", "http://localhost/*"],

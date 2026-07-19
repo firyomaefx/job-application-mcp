@@ -10,9 +10,11 @@
 // stdio server exposes.
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { pathToFileURL } from "node:url";
 import { toolByName, tools } from "./tools/index.js";
 import { openDb } from "./store/db.js";
 import { createServer as createMcpServer } from "./server.js";
+import { safeEqual } from "./lib/crypto.js";
 
 const PORT = Number(process.env.JOB_MCP_HTTP_PORT ?? 8787);
 const TOKEN = process.env.JOB_MCP_HTTP_TOKEN; // optional shared secret
@@ -38,27 +40,50 @@ async function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
-function send(res: ServerResponse, status: number, payload: BridgeResponse) {
+/**
+ * CORS: this bridge is loopback-only, but we still must not let an arbitrary
+ * web origin drive it. Allow only the Chrome extension scheme and localhost
+ * loopback origins. The Origin is reflected only if it matches; otherwise no
+ * ACAO header is sent, so the browser blocks cross-origin reads.
+ */
+export function allowedOrigin(req: IncomingMessage): string | null {
+  const origin = req.headers["origin"];
+  if (!origin) return null; // non-browser clients (curl, extension bg) — no CORS header needed
+  if (/^chrome-extension:\/\/[a-z]+$/i.test(origin)) return origin;
+  if (/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/i.test(origin)) return origin;
+  return null;
+}
+
+function send(res: ServerResponse, status: number, payload: BridgeResponse, req?: IncomingMessage) {
   const json = JSON.stringify(payload);
-  res.writeHead(status, {
+  const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "X-Content-Type-Options": "nosniff",
-  });
+  };
+  if (req) {
+    const origin = allowedOrigin(req);
+    if (origin) {
+      headers["Access-Control-Allow-Origin"] = origin;
+      headers["Vary"] = "Origin";
+    }
+  }
+  res.writeHead(status, headers);
   res.end(json);
 }
 
 function authorized(req: IncomingMessage): boolean {
   if (!TOKEN) return true;
   const header = req.headers["authorization"] ?? "";
-  return header === `Bearer ${TOKEN}`;
+  // Constant-time compare so a shared secret on loopback isn't leaked via timing.
+  return safeEqual(header, `Bearer ${TOKEN}`);
 }
 
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (req.method === "OPTIONS") {
-    send(res, 204, { ok: true });
+    // Only preflight for allowed origins; others get a bare 204 (no ACAO).
+    send(res, 204, { ok: true }, req);
     return;
   }
 
@@ -66,25 +91,25 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     send(res, 200, {
       ok: true,
       data: { tools: tools.map((t) => t.name) },
-    });
+    }, req);
     return;
   }
 
   if (req.url === "/call" && req.method === "POST") {
     if (!authorized(req)) {
-      send(res, 401, { ok: false, error: "unauthorized" });
+      send(res, 401, { ok: false, error: "unauthorized" }, req);
       return;
     }
     let parsed: { name?: string; arguments?: unknown };
     try {
       parsed = JSON.parse(await readBody(req)) as { name?: string; arguments?: unknown };
     } catch {
-      send(res, 400, { ok: false, error: "invalid JSON body" });
+      send(res, 400, { ok: false, error: "invalid JSON body" }, req);
       return;
     }
     const tool = toolByName.get(parsed.name ?? "");
     if (!tool) {
-      send(res, 404, { ok: false, error: `unknown tool: ${parsed.name}` });
+      send(res, 404, { ok: false, error: `unknown tool: ${parsed.name}` }, req);
       return;
     }
     const validation = tool.inputSchema.safeParse(parsed.arguments ?? {});
@@ -93,7 +118,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
         ok: false,
         tool: parsed.name,
         error: `invalid arguments: ${validation.error.message}`,
-      });
+      }, req);
       return;
     }
     try {
@@ -104,15 +129,15 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
         summary: result.summary,
         data: result.data,
         notes: result.notes,
-      });
+      }, req);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      send(res, 500, { ok: false, tool: parsed.name, error: message });
+      send(res, 500, { ok: false, tool: parsed.name, error: message }, req);
     }
     return;
   }
 
-  send(res, 404, { ok: false, error: `not found: ${req.method} ${req.url}` });
+  send(res, 404, { ok: false, error: `not found: ${req.method} ${req.url}` }, req);
 }
 
 async function main(): Promise<void> {
@@ -147,7 +172,13 @@ async function main(): Promise<void> {
   process.on("SIGTERM", () => shutdown("SIGTERM"));
 }
 
-main().catch((err) => {
-  console.error("job-application-mcp HTTP bridge failed to start:", err);
-  process.exit(1);
-});
+// Only start the server when run as the entry point, not when imported (e.g. by
+// tests importing `allowedOrigin`). Avoids a side-effect listener on import.
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isMain) {
+  main().catch((err) => {
+    console.error("job-application-mcp HTTP bridge failed to start:", err);
+    process.exit(1);
+  });
+}

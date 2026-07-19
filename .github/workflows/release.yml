@@ -120,14 +120,21 @@ jobs:
           body: |
             ## Job Application MCP ${{ github.ref_name }}
 
-            **This is alpha software.** Free community core only.
+            **This is alpha software.** Free community core only — Pro/hosted
+            services are not yet enabled.
 
             ### Downloads
-            - **Windows installer** — `*-Setup.exe` (runs the desktop app; requires Node.js on PATH for the bridge)
+            - **Windows installer** — `*-Setup.exe`
             - **macOS** — `*.dmg`
             - **Linux** — `*.AppImage`
             - **Chrome extension** — `job-application-mcp-extension.zip` (load unpacked in `chrome://extensions`)
             - **Core build** — `job-application-mcp-core-dist.zip` (for stdio MCP clients)
 
-            See the [README](https://github.com/firyomaefx/job-application-mcp#readme) for setup.
-            See [CHANGELOG.md](https://github.com/firyomaefx/job-application-mcp/blob/main/CHANGELOG.md) for changes.
+            > **Desktop installer is a developer preview.** It launches the
+            > Electron shell and spawns the local HTTP bridge via `node`, so it
+            > requires Node.js on PATH and a built project. It does not bundle
+            > the server. For a stable experience, run the stdio core or HTTP
+            > bridge directly.
+
+            See the [README](${{ github.server_url }}/${{ github.repository }}#readme) for setup.
+            See [CHANGELOG.md](${{ github.server_url }}/${{ github.repository }}/blob/main/CHANGELOG.md) for changes.

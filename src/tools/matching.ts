@@ -3,9 +3,33 @@ import type { ToolDef } from "./types.js";
 import { getDefaultProfile } from "../store/profile.js";
 import { getCv, getJob, saveApplication } from "../store/applications.js";
 import { extractKeywords, scoreMatch } from "../lib/scoring.js";
-import { getProvider, type AiContext } from "../ai/provider.js";
+import { getProvider, type AiContext, type AiProvider } from "../ai/provider.js";
 import { resolveAiMode } from "../features.js";
 import { tryDebit } from "../licence/credits.js";
+
+/**
+ * Resolve the AI provider for a tool call.
+ *
+ * - A user who supplies their own API key (AI_API_KEY) gets the real provider,
+ *   whether on the Free or Pro plan. This honours the free-core guarantee that
+ *   users can use their own Claude/OpenAI key.
+ * - The Pro *hosted* path additionally debits an AI credit (when a Pro
+ *   entitlement + balance exist). Free users with their own key are never
+ *   debited (no credits, no hosted quota).
+ * - With no key, fall back to the local heuristic (mock) provider.
+ */
+export async function resolveProvider(
+  feature: string,
+  reason: "ai_tailor" | "ai_cover" | "ai_answer",
+  ref: string,
+): Promise<{ provider: AiProvider; usedAi: boolean; debited: boolean }> {
+  const haveKey = !!process.env.AI_API_KEY;
+  const mode = resolveAiMode(feature); // 'ai' only when Pro entitlement + balance
+  const usedAi = haveKey;
+  const debited = mode === "ai" && haveKey && tryDebit(reason, ref);
+  const provider = await getProvider({ useReal: usedAi });
+  return { provider, usedAi, debited };
+}
 
 function buildContext(job: { title: string; description: string; keywords: string[] }, cvText: string, question?: string): AiContext {
   const profile = getDefaultProfile();
@@ -78,8 +102,9 @@ const tailorCvSchema = z.object({
 export const tailorCvTool: ToolDef<typeof tailorCvSchema> = {
   name: "tailor_cv",
   description:
-    "Tailor a CV toward a job. Free core: heuristic structural draft (local). " +
-    "Pro (with AI provider + credits): AI-rewritten prose. One AI credit debited on the Pro path.",
+    "Tailor a CV toward a job. With your own AI API key (AI_API_KEY, free or Pro): " +
+    "AI-rewritten prose. Without a key: heuristic structural draft (local). " +
+    "The Pro hosted path debits one AI credit; free use of your own key is never debited.",
   inputSchema: tailorCvSchema,
   run: async (input) => {
     const job = getJob(input.job_id);
@@ -87,13 +112,11 @@ export const tailorCvTool: ToolDef<typeof tailorCvSchema> = {
     const cv = getCv(input.cv_id);
     if (!cv) return { summary: `CV ${input.cv_id} not found.` };
 
-    const mode = resolveAiMode("ai_cv_tailoring");
-    const usedAi = mode === "ai" && tryDebit("ai_tailor", String(input.job_id));
-    const provider = await getProvider({ useReal: usedAi });
+    const { provider, usedAi, debited } = await resolveProvider("ai_cv_tailoring", "ai_tailor", String(input.job_id));
     const result = await provider.tailorCv(buildContext(job, cv.text));
 
     return {
-      summary: `Tailored CV draft for "${job.title}" (${usedAi ? "AI" : "heuristic"}, provider: ${provider.name}).`,
+      summary: `Tailored CV draft for "${job.title}" (${usedAi ? "AI" : "heuristic"}, provider: ${provider.name}${debited ? ", 1 credit debited" : ""}).`,
       data: { text: result.text, mode: usedAi ? "ai" : "heuristic" },
       notes: result.notes,
     };
@@ -108,8 +131,9 @@ const coverLetterSchema = z.object({
 export const coverLetterTool: ToolDef<typeof coverLetterSchema> = {
   name: "cover_letter",
   description:
-    "Draft a cover letter for a job. Free core: heuristic scaffold (local). " +
-    "Pro (with AI provider + credits): full AI-drafted prose. One AI credit debited on the Pro path.",
+    "Draft a cover letter for a job. With your own AI API key (AI_API_KEY, free or Pro): " +
+    "full AI-drafted prose. Without a key: heuristic scaffold (local). " +
+    "The Pro hosted path debits one AI credit; free use of your own key is never debited.",
   inputSchema: coverLetterSchema,
   run: async (input) => {
     const job = getJob(input.job_id);
@@ -117,13 +141,11 @@ export const coverLetterTool: ToolDef<typeof coverLetterSchema> = {
     const cv = getCv(input.cv_id);
     if (!cv) return { summary: `CV ${input.cv_id} not found.` };
 
-    const mode = resolveAiMode("ai_cover_letter");
-    const usedAi = mode === "ai" && tryDebit("ai_cover", String(input.job_id));
-    const provider = await getProvider({ useReal: usedAi });
+    const { provider, usedAi, debited } = await resolveProvider("ai_cover_letter", "ai_cover", String(input.job_id));
     const result = await provider.coverLetter(buildContext(job, cv.text));
 
     return {
-      summary: `Cover letter draft for "${job.title}" (${usedAi ? "AI" : "heuristic"}, provider: ${provider.name}).`,
+      summary: `Cover letter draft for "${job.title}" (${usedAi ? "AI" : "heuristic"}, provider: ${provider.name}${debited ? ", 1 credit debited" : ""}).`,
       data: { text: result.text, mode: usedAi ? "ai" : "heuristic" },
       notes: result.notes,
     };
@@ -139,9 +161,9 @@ const draftAnswerSchema = z.object({
 export const draftAnswerTool: ToolDef<typeof draftAnswerSchema> = {
   name: "draft_answer",
   description:
-    "Draft a screening-answer starter. Free core: heuristic template (local). " +
-    "Pro (with AI provider + credits): AI-drafted answer from verified CV facts. " +
-    "Always review before use; one AI credit debited on the Pro path.",
+    "Draft a screening-answer starter. With your own AI API key (AI_API_KEY, free or Pro): " +
+    "AI-drafted answer from verified CV facts. Without a key: heuristic template (local). " +
+    "Always review before use. The Pro hosted path debits one AI credit; free use of your own key is never debited.",
   inputSchema: draftAnswerSchema,
   run: async (input) => {
     const cv = input.cv_id ? getCv(input.cv_id) : null;
@@ -149,13 +171,11 @@ export const draftAnswerTool: ToolDef<typeof draftAnswerSchema> = {
     const cvText = cv?.text ?? "";
     const ctxJob = job ?? { title: "the role", description: "", keywords: [] as string[] };
 
-    const mode = resolveAiMode("ai_answer");
-    const usedAi = mode === "ai" && tryDebit("ai_answer", String(input.job_id ?? ""));
-    const provider = await getProvider({ useReal: usedAi });
+    const { provider, usedAi, debited } = await resolveProvider("ai_answer", "ai_answer", String(input.job_id ?? ""));
     const result = await provider.draftAnswer(buildContext(ctxJob, cvText, input.question));
 
     return {
-      summary: `Drafted answer (${usedAi ? "AI" : "heuristic"}, provider: ${provider.name}).`,
+      summary: `Drafted answer (${usedAi ? "AI" : "heuristic"}, provider: ${provider.name}${debited ? ", 1 credit debited" : ""}).`,
       data: { question: input.question, text: result.text, mode: usedAi ? "ai" : "heuristic" },
       notes: result.notes,
     };

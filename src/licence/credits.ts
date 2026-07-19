@@ -44,12 +44,20 @@ function ledger(profileId: number, delta: number, reason: LedgerReason, ref?: st
   ).run(profileId, delta, reason, ref ?? null, ts);
 }
 
-/** Grant a monthly allowance (idempotent per period via the period check). */
+/** Grant a monthly allowance (idempotent per period). */
 export function grantMonthly(profileId: number, amount: number): number {
-  const before = getRow(profileId);
-  if (before.period === currentPeriod() && before.balance > 0) {
-    // Already granted this period — don't double-grant.
-    return before.balance;
+  const period = currentPeriod();
+  const db = openDb();
+  // Idempotent: if a 'grant' was already recorded this calendar month, do not
+  // re-grant — even if the balance has since been spent down to zero. Keying on
+  // balance > 0 (the old logic) let a re-call double-grant after spend-out.
+  const already = db
+    .prepare(
+      "SELECT id FROM credit_ledger WHERE profile_id = ? AND reason = 'grant' AND created_at LIKE ? LIMIT 1",
+    )
+    .get(profileId, `${period}-%`) as { id: number } | undefined;
+  if (already) {
+    return getRow(profileId).balance;
   }
   ledger(profileId, amount, "grant");
   return getRow(profileId).balance;

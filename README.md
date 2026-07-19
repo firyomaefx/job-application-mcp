@@ -125,7 +125,7 @@ npm run build      # -> dist/
 ### Verify it works
 
 ```bash
-npm test           # 8 unit tests (scoring + store)
+npm test           # 40 unit tests (scoring, store, licence, credits, ai, payments, audit-fixes)
 node dist/cli/cli.js --help
 ```
 
@@ -164,8 +164,12 @@ The server speaks JSON-RPC over stdio. See
 
 ## Tools reference
 
-All 13 tools are local and synchronous-ish (CV parsing is async). Arguments are
-validated with zod; the MCP client receives a JSON Schema for each.
+All 23 tools are local and synchronous-ish (CV parsing and AI calls are async).
+Arguments are validated with zod; the MCP client receives a JSON Schema for each.
+The **13 free-core tools** (profile → autofill) are the everyday workflow. The
+**credits/Pro** and **admin/business** tools are wire-ready seams for the hosted
+Pro service (see [Business model](#business-model)); they run locally today and
+do not require any subscription.
 
 ### Profile
 
@@ -182,7 +186,9 @@ validated with zod; the MCP client receives a JSON Schema for each.
 | `list_cvs` | — | All stored CVs. |
 
 `parse_cv` supports `.pdf` (pdf-parse), `.docx` (mammoth), and plain text. If you
-pass `text`, it's stored as-is.
+pass `text`, it's stored as-is. `file_path` must be inside the data dir (or a
+folder listed in `JOB_MCP_CV_DIRS`) — paths outside the allow-list are rejected,
+so an MCP client can't read arbitrary files.
 
 ### Jobs
 
@@ -196,8 +202,15 @@ pass `text`, it's stored as-is.
 | Tool | Args | Returns |
 | --- | --- | --- |
 | `match_cv` | `job_id`, `cv_id`, `save?=false` | 0–100 score, matched/missing/extra skills; optionally creates a draft application. |
-| `tailor_cv` | `job_id`, `cv_id` | Suggestions: skills to surface, profile skills to add, genuine gaps. |
-| `draft_answer` | `question`, `cv_id?, profile_summary?` | A **template starter** with talking points — not a finished answer. |
+| `tailor_cv` | `job_id`, `cv_id` | Tailored CV draft. With your own AI API key (`AI_API_KEY`): AI-rewritten prose; without: heuristic local draft. |
+| `cover_letter` | `job_id`, `cv_id` | Cover-letter draft (AI with your own key, else heuristic). |
+| `draft_answer` | `question`, `cv_id?, job_id?` | Screening-answer draft (AI with your own key, else heuristic template). Always review. |
+
+> **AI tools and your own key.** `tailor_cv`, `cover_letter`, and `draft_answer`
+> use a real AI provider when you set `AI_PROVIDER` (`openai` or `anthropic`) and
+> `AI_API_KEY` — on the Free **or** Pro plan. Without a key they fall back to a
+> local heuristic. The Pro *hosted* path additionally debits an AI credit; using
+> your own key is never debited. See [Business model](#business-model).
 
 ### Applications & forms
 
@@ -209,6 +222,30 @@ pass `text`, it's stored as-is.
 | `autofill_form` | `application_id`, `form_fields?` | A **preview** mapping of profile data onto form fields. Nothing is submitted. |
 
 **Status pipeline:** `draft → ready → submitted → interview → offer → rejected → closed`.
+
+### Analytics & status
+
+| Tool | Args | Returns |
+| --- | --- | --- |
+| `application_analytics` | — | Counts by status, average match score, recent activity. Pro entitlement adds an advanced breakdown. |
+| `status` | — | Server/plan/credits snapshot (plan label, AI credit balance, active features). |
+
+### Credits & Pro (wire-ready seams)
+
+| Tool | Args | Returns |
+| --- | --- | --- |
+| `credits` | — | Current AI credit balance + recent ledger entries. |
+| `topup_credits` | `code`, `amount` | Apply an AI-credit top-up code (idempotent per code). Admin/test. |
+| `grant_monthly_credits` | `amount?` | Grant the monthly AI allowance (idempotent per calendar month). Admin/test. |
+
+### Admin / business (wire-ready seams)
+
+| Tool | Args | Returns |
+| --- | --- | --- |
+| `admin_create_account` | `email`, `name`, `plan?` | Create a business account. |
+| `admin_add_candidate` | `account_id`, `profile_id`, `role?` | Add a candidate/coach to an account. |
+| `admin_list_team` | `account_id` | List an account's team members. |
+| `admin_usage_report` | `account_id` | Usage summary for an account. |
 
 ---
 
@@ -259,15 +296,19 @@ All config is via environment variables. **The free core needs none of them.**
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `JOB_MCP_DATA_DIR` | `./data` | Where the SQLite DB and parsed data live. |
+| `JOB_MCP_CV_DIRS` | — | Extra folders `parse_cv` may read from (OS path separator: `;` on Windows, `:` elsewhere). |
+| `JOB_MCP_HTTP_PORT` | `8787` | Port for the local HTTP bridge (loopback only). |
+| `JOB_MCP_HTTP_TOKEN` | — | Optional bearer token the bridge requires on `/call`. |
 
-The following are **placeholders for future Pro/cloud services** (not used by the
-free core — see `.env.example`):
+The following enable **your own AI key** (works on Free **or** Pro) and are
+placeholders for future hosted Pro/cloud services (see `.env.example`):
 
 | Variable | Purpose |
 | --- | --- |
-| `JOB_MCP_LICENCE_SERVER` | Pro licence activation endpoint. |
-| `SUPABASE_URL` / `SUPABASE_ANON_KEY` | Cloud sync & auth (Pro). |
-| `AI_PROVIDER` / `AI_API_KEY` | AI tailoring & answer drafting (Pro). |
+| `AI_PROVIDER` / `AI_API_KEY` | `openai` or `anthropic` + your own key → real AI drafts for `tailor_cv` / `cover_letter` / `draft_answer`. Free users use this without any subscription. |
+| `AI_MODEL` / `AI_BASE_URL` | Optional model + base URL override (e.g. an OpenAI-compatible endpoint). |
+| `JOB_MCP_LICENCE_SERVER` | Pro licence activation endpoint (hosted service). |
+| `SUPABASE_URL` / `SUPABASE_ANON_KEY` | Cloud sync & auth (Pro, hosted). |
 
 ---
 
@@ -279,20 +320,30 @@ job-application-mcp/
 │   ├── index.ts           # stdio MCP server entrypoint
 │   ├── http.ts            # local HTTP bridge entrypoint (127.0.0.1)
 │   ├── server.ts          # server factory + tool registry
-│   ├── tools/             # one file per MCP tool
+│   ├── tools/             # one file per MCP tool (23 total)
 │   │   ├── types.ts       # ToolDef / AnyTool / result helpers
 │   │   ├── profile.ts     # get/update_profile
 │   │   ├── cv.ts          # parse_cv, list_cvs
 │   │   ├── job.ts         # analyze_job, get_job
-│   │   ├── matching.ts    # match_cv, tailor_cv, draft_answer
-│   │   └── application.ts # save/list/update_application, autofill_form
+│   │   ├── matching.ts    # match_cv, tailor_cv, cover_letter, draft_answer
+│   │   ├── application.ts # save/list/update_application, autofill_form
+│   │   ├── analytics.ts   # application_analytics, status
+│   │   ├── pro.ts         # credits, topup_credits, grant_monthly_credits
+│   │   └── admin.ts       # admin_create_account / add_candidate / list_team / usage_report
 │   ├── store/             # SQLite layer (node:sqlite)
 │   │   ├── db.ts          # open / migrate / close / reset
 │   │   ├── profile.ts     # profile CRUD
 │   │   └── applications.ts# cv / job / application CRUD
-│   ├── cv/parser.ts       # PDF / DOCX / TXT parsing
+│   ├── cv/parser.ts       # PDF / DOCX / TXT parsing (path allow-listed)
+│   ├── ai/                # provider abstraction (mock / openai / anthropic)
+│   ├── licence/           # entitlement tokens + credits + referrals
+│   ├── payments/          # payment-webhook seam (server-side, not in clients)
+│   ├── sync/              # cloud-sync seam (local no-op until Pro)
+│   ├── features.ts        # feature gating (plan + credits + AI mode)
 │   └── lib/
 │       ├── types.ts       # domain types
+│       ├── crypto.ts      # HMAC-SHA256 + constant-time compare
+│       ├── entitlement.ts # Entitlement value type + plan limits
 │       └── scoring.ts     # keyword extraction + match scoring (pure)
 ├── cli/cli.ts             # human CLI: job-mcp serve | serve:http | --help
 ├── extension/             # Chrome MV3 extension (form capture → preview)

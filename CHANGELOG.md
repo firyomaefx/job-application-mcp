@@ -6,6 +6,53 @@ breaking changes may bump the minor version.
 
 ## [Unreleased]
 
+## [0.1.2] — 2026-07-20
+
+### Security / compliance (audit fixes)
+- **Bridge CORS hardening**: the HTTP bridge no longer sends
+  `Access-Control-Allow-Origin: *`. Only `chrome-extension://` and loopback
+  (`127.0.0.1` / `localhost`) origins are reflected; arbitrary web origins get
+  no ACAO header and are blocked by the browser. Bearer-token check now uses a
+  constant-time compare. The listener is also guarded so importing `http.ts`
+  (e.g. in tests) no longer starts a server.
+- **Free users can use their own AI key**: `tailor_cv`, `cover_letter`, and
+  `draft_answer` now use a real AI provider whenever `AI_API_KEY` is set — on
+  the Free **or** Pro plan — instead of gating AI behind the Pro entitlement.
+  Using your own key is never debited; only the Pro hosted path debits a credit.
+- **`parse_cv` path allow-list**: `file_path` must be inside the data dir
+  (`+ cvs/`) or a folder listed in `JOB_MCP_CV_DIRS`. Paths outside the
+  allow-list are rejected, so an MCP client cannot read arbitrary files.
+- **Entitlement integrity**: the local `entitlement.json` is now MAC-signed with
+  a per-install secret; editing it by hand falls back to Free. (Defense-in-depth
+  only — real Pro enforcement stays server-side, deferred until the hosted
+  service launches.)
+- **`grantMonthly` idempotency**: re-granting after spending the balance to zero
+  no longer double-grants in the same calendar month.
+
+### Fixed (release)
+- Desktop installers now build: electron-builder 25 was crashing on
+  `--publish never` because no publish provider was configured. Added a
+  `publish` block to `desktop/package.json` and used valid `--<platform>
+  <target>` CLI flags.
+- Release body no longer hardcodes a GitHub username; desktop installer is
+  labelled a developer preview (requires Node.js on PATH; does not bundle the
+  bridge).
+
+### Docs
+- README tools reference now documents all **23** tools (was 13), including
+  `cover_letter`, `application_analytics`, `status`, `credits`/`topup_credits`/
+  `grant_monthly_credits`, and the four `admin_*` tools.
+- README/CLAUDE project layout updated to include `src/ai/`, `src/licence/`,
+  `src/payments/`, `src/sync/`, `src/features.ts`, and `src/lib/crypto.ts` /
+  `entitlement.ts`.
+- Configuration docs cover `JOB_MCP_CV_DIRS`, `JOB_MCP_HTTP_PORT`/`_TOKEN`, and
+  the own-AI-key env vars.
+
+### Tests
+- Added `tests/audit-fixes.test.ts` (12 tests) covering the entitlement MAC,
+  free-user own-key AI, bridge CORS allow-list, `parse_cv` path scoping, and
+  `grantMonthly` spend-out idempotency. Suite is now 40 tests (was 29).
+
 ## [0.1.1] — 2026-07-20
 
 ### Added
