@@ -127,17 +127,16 @@ jobs:
             services are not yet enabled.
 
             ### Downloads
-            - **Windows installer** — `*-Setup.exe`
-            - **macOS** — `*.dmg`
-            - **Linux** — `*.AppImage`
+            - **Windows installer** — `*-Setup.exe` (standalone; no Node.js install required)
+            - **macOS** — `*.dmg` (standalone)
+            - **Linux** — `*.AppImage` (standalone)
             - **Chrome extension** — `job-application-mcp-extension.zip` (load unpacked in `chrome://extensions`)
             - **Core build** — `job-application-mcp-core-dist.zip` (for stdio MCP clients)
 
-            > **Desktop installer is a developer preview.** It launches the
-            > Electron shell and spawns the local HTTP bridge via `node`, so it
-            > requires Node.js on PATH and a built project. It does not bundle
-            > the server. For a stable experience, run the stdio core or HTTP
-            > bridge directly.
+            > **Standalone desktop app.** The installer bundles the HTTP bridge
+            > (a single self-contained file) and runs it on Electron's own Node
+            > runtime — **no system Node.js is required**. It only reads local
+            > data; submission stays manual.
 
             See the [README](${{ github.server_url }}/${{ github.repository }}#readme) for setup.
             See [CHANGELOG.md](${{ github.server_url }}/${{ github.repository }}/blob/main/CHANGELOG.md) for changes.
