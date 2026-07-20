@@ -6,6 +6,39 @@ breaking changes may bump the minor version.
 
 ## [Unreleased]
 
+## [0.1.3] — 2026-07-20
+
+### Production-readiness hardening (Cycle 2 audit)
+
+- **Standalone desktop app**: the Windows installer (NSIS), Linux AppImage, and
+  macOS DMG no longer require Node.js on the user's PATH. The HTTP bridge is
+  esbuild-bundled into a single self-contained file and forked from Electron's
+  own bundled Node runtime (`ELECTRON_RUN_AS_NODE`). The release workflow runs
+  `bundle:bridge` before packaging.
+- **Prompt-injection hardening**: AI prompts now treat job/CV content as
+  untrusted. A shared system prompt forbids following instructions inside
+  untrusted content or revealing API keys/system prompt/PII, and untrusted
+  content is wrapped in `<untrusted>` delimiters (injected closing tags are
+  stripped) so a malicious job description cannot escape the wrapper.
+- **Claude cost controls**: AI calls now measure token usage and cost, enforce a
+  monthly spend cap (`JOB_MCP_AI_MONTHLY_LIMIT_USD`, default $20, 0=unlimited),
+  retry with backoff, and rate-limit. A failed or capped real-AI call falls
+  back to the local heuristic draft — no debit, workflow continues. Credits are
+  debited only on a successful Pro hosted result.
+- **Approval-gated submission recording**: a submission can now only be
+  *recorded* (never performed) after a full validation gate and a short-lived
+  (10 min) single-use approval token. New tools `request_approval` and
+  `confirm_submission`. Nothing is ever submitted to a browser.
+- **Local backup/restore**: new `backup_data`, `list_backups`, and `restore_data`
+  tools. Restore writes a safety snapshot first.
+- **Entitlement-activity log**: activate/renew/expire/downgrade events are
+  recorded; local data and the credit ledger are preserved across
+  upgrade/downgrade/expiry.
+- **Form-field classification**: sensitive-field detection and key guessing are
+  now a pure, tested module shared by the autofill tool and the extension.
+- **Schema v3** (additive): `approval_tokens`, `entitlement_events`, `ai_usage`.
+- Tool count 23 → 28; test suite 40 → 72 (all green).
+
 ## [0.1.2] — 2026-07-20
 
 ### Security / compliance (audit fixes)
