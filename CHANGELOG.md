@@ -6,6 +6,21 @@ breaking changes may bump the minor version.
 
 ## [Unreleased]
 
+## [0.2.2] — 2026-07-20
+
+### Job inbox/ranking + follow-up reminders (Windows roadmap Phase 3)
+
+- **Job inbox.** Imported jobs now carry an inbox status (`new` / `triaged` /
+  `applied` / `archived`). New tools: `list_job_inbox`, `triage_job`, and
+  `rank_jobs`, which ranks your inbox by best application match score plus a
+  30-day recency bonus so the freshest well-matched jobs surface first
+  (pure, tested `src/lib/inbox.ts`). Archived jobs are excluded by default.
+- **Reminders.** New `add_reminder`, `list_reminders`, `due_reminders`,
+  `complete_reminder`, `delete_reminder` tools (schema v5 `reminders` table).
+  The desktop app surfaces due/overdue reminders on launch. Local-only.
+- Schema v5 (additive: jobs `inbox_status` + `reminders` table; no data loss).
+- Tool count 32 → 39; test suite 90 → 96.
+
 ## [0.2.1] — 2026-07-20
 
 ### CV versioning + export + application editing (Windows roadmap Phase 2)

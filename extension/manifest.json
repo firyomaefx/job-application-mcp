@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Job Application MCP — Form Capture & Job Import",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Capture form fields and one-click import job postings on a career page into your local Job Application MCP profile. Nothing is submitted.",
   "permissions": ["activeTab", "scripting", "storage"],
   "host_permissions": [

@@ -1,6 +1,6 @@
 {
   "name": "job-application-mcp-desktop",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "description": "Desktop wrapper UI for Job Application MCP. Launches the local HTTP bridge and shows your profile, applications, and server status.",
   "license": "AGPL-3.0-or-later",
