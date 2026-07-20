@@ -17,9 +17,9 @@ export function saveCv(profileId: number, label: string, text: string, sourcePat
   const db = openDb();
   const info = db
     .prepare(
-      "INSERT INTO cvs (profile_id, label, source_path, text, created_at) VALUES (?, ?, ?, ?, ?)"
+      "INSERT INTO cvs (profile_id, label, source_path, text, parent_cv_id, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
     )
-    .run(profileId, label, sourcePath, text, now());
+    .run(profileId, label, sourcePath, text, null, 1, now());
   const row = db.prepare("SELECT * FROM cvs WHERE id = ?").get(Number(info.lastInsertRowid));
   return row as unknown as Cv;
 }
@@ -28,6 +28,68 @@ export function getCv(id: number): Cv | null {
   const db = openDb();
   const row = db.prepare("SELECT * FROM cvs WHERE id = ?").get(id);
   return (row as Cv | undefined) ?? null;
+}
+
+export function updateCv(
+  profileId: number,
+  cvId: number,
+  changes: { text?: string; label?: string }
+): Cv | null {
+  const db = openDb();
+  
+  // Get the current CV to use as parent
+  const current = getCv(cvId);
+  if (!current) return null;
+  
+  // Mark the current CV as inactive
+  db.prepare("UPDATE cvs SET is_active = 0 WHERE id = ?").run(cvId);
+  
+  // Create a new version with the current as parent
+  const info = db
+    .prepare(
+      "INSERT INTO cvs (profile_id, label, source_path, text, parent_cv_id, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    )
+    .run(
+      profileId,
+      changes.label ?? current.label,
+      current.source_path,
+      changes.text ?? current.text,
+      cvId,
+      1,
+      now()
+    );
+  
+  const row = db.prepare("SELECT * FROM cvs WHERE id = ?").get(Number(info.lastInsertRowid));
+  return (row as Cv | undefined) ?? null;
+}
+
+export function getCvHistory(profileId: number, cvId: number): Cv[] {
+  const db = openDb();
+  
+  // Find the root CV by following parent_cv_id upwards
+  let current = getCv(cvId);
+  if (!current) return [];
+  
+  while (current.parent_cv_id) {
+    const parent = getCv(current.parent_cv_id);
+    if (!parent) break;
+    current = parent;
+  }
+  
+  // Now traverse downwards to build the full chain
+  const chain: Cv[] = [current];
+  let next = db
+    .prepare("SELECT * FROM cvs WHERE parent_cv_id = ? AND profile_id = ? ORDER BY created_at ASC")
+    .get(current.id, profileId) as Cv | undefined;
+  
+  while (next) {
+    chain.push(next);
+    next = db
+      .prepare("SELECT * FROM cvs WHERE parent_cv_id = ? AND profile_id = ? ORDER BY created_at ASC")
+      .get(next.id, profileId) as Cv | undefined;
+  }
+  
+  return chain;
 }
 
 // ── Jobs ───────────────────────────────────────────────────────
