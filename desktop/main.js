@@ -174,7 +174,16 @@ function createWindow() {
 ipcMain.handle("bridge:start", () => startBridge());
 ipcMain.handle("bridge:stop", () => stopBridge());
 ipcMain.handle("bridge:restart", () => { stopBridge(); setTimeout(startBridge, 300); });
-ipcMain.handle("bridge:info", () => ({ url: bridgeUrl(), status: bridgeStatus, port: BRIDGE_PORT }));
+ipcMain.handle("bridge:info", () => ({
+  url: bridgeUrl(),
+  status: bridgeStatus,
+  port: BRIDGE_PORT,
+  // The loopback bearer token. Exposed to the sandboxed renderer so it can
+  // authorize /detect and /settings when the bridge is token-gated. The token
+  // is only useful on 127.0.0.1; the renderer already calls /call, so the
+  // threat model is unchanged.
+  token: BRIDGE_TOKEN,
+}));
 ipcMain.handle("data:openDir", () => {
   const dir = dataDir();
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });

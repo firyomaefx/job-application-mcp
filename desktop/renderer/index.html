@@ -33,6 +33,48 @@
       <button id="update-dismiss">Later</button>
     </div>
 
+    <section class="card setup-card" id="setup">
+      <h2>Setup &amp; Status <span class="count" id="auto-configure-msg"></span></h2>
+      <button id="auto-configure" class="primary big">Auto-configure &amp; start</button>
+      <ul class="checklist" id="setup-checklist">
+        <li><span class="dot" id="ck-bridge-dot"></span><span id="ck-bridge-text">Bridge…</span><button id="bridge-toggle">Restart bridge</button></li>
+        <li><span class="dot" id="ck-ai-dot"></span><span id="ck-ai-text">AI…</span><span class="chips" id="ck-ai-chips">
+          <button class="chip" data-prov="mock">Mock</button>
+          <button class="chip" data-prov="ollama">Ollama</button>
+          <button class="chip" data-prov="key">My key</button>
+        </span></li>
+        <li><span class="dot" id="ck-profile-dot"></span><span id="ck-profile-text">Profile…</span><button id="setup-profile">Set up profile</button></li>
+        <li><span class="dot" id="ck-cv-dot"></span><span id="ck-cv-text">CV…</span><button id="setup-cv">Import CV</button></li>
+      </ul>
+      <details id="ai-settings">
+        <summary>AI settings</summary>
+        <form id="ai-settings-form" class="ai-form">
+          <label>Provider
+            <select id="ai-prov-select">
+              <option value="">(env / mock)</option>
+              <option value="mock">Mock (offline)</option>
+              <option value="ollama">Ollama (local)</option>
+              <option value="openai">OpenAI (my key)</option>
+              <option value="anthropic">Anthropic (my key)</option>
+            </select>
+          </label>
+          <label>Model
+            <input id="ai-model" type="text" placeholder="e.g. gpt-4o-mini / llama3.1" />
+          </label>
+          <label>Base URL
+            <input id="ai-base-url" type="text" placeholder="http://localhost:11434/v1" />
+          </label>
+          <label>API key
+            <input id="ai-api-key" type="password" placeholder="Enter API key" autocomplete="off" />
+          </label>
+          <div class="ai-form-actions">
+            <button id="ai-save" class="primary" type="submit">Save</button>
+            <button id="ai-clear-key" type="button">Clear key</button>
+          </div>
+        </form>
+      </details>
+    </section>
+
     <section class="card">
       <h2>Profile</h2>
       <div id="profile" class="profile"><span class="muted">No profile yet.</span></div>

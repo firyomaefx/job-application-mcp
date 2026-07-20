@@ -19,6 +19,7 @@ import {
 } from "./reminders.js";
 import { requestApprovalTool, confirmSubmissionTool } from "./submission.js";
 import { analyticsTool, statusTool } from "./analytics.js";
+import { systemCheckTool } from "./system_check.js";
 import { backupDataTool, listBackupsTool, restoreDataTool } from "./backup.js";
 import { topupCreditsTool, creditsTool, grantMonthlyTool } from "./pro.js";
 import {
@@ -65,6 +66,7 @@ export const tools: AnyTool[] = [
   // analytics + status
   analyticsTool,
   statusTool,
+  systemCheckTool,
   // backup / restore (local)
   backupDataTool,
   listBackupsTool,

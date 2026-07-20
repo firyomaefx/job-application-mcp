@@ -117,6 +117,46 @@ td.muted, .muted { color: var(--muted); }
   font-size: 13px;
 }
 .update-banner button { font-size: 12px; padding: 6px 12px; }
+
+/* ── Setup & Status card (v0.4.0 one-click) ─────────────────── */
+.setup-card .big {
+  width: 100%;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+.checklist { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.checklist li {
+  display: grid;
+  grid-template-columns: 14px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+.checklist .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--off); }
+.checklist .dot.on { background: var(--ok); }
+.checklist .dot.bad { background: var(--bad); }
+.checklist button { font-size: 11px; padding: 4px 10px; }
+.chips { display: inline-flex; gap: 6px; }
+.chip {
+  font-size: 11px; padding: 3px 10px; border-radius: 999px;
+  background: var(--panel); border: 1px solid var(--line);
+}
+.chip.active { background: var(--indigo); border-color: var(--indigo); color: #fff; }
+details { margin-top: 12px; }
+summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+.ai-form { display: grid; gap: 10px; margin-top: 10px; }
+.ai-form label { display: grid; gap: 4px; font-size: 11px; color: var(--muted); }
+.ai-form input, .ai-form select {
+  font: inherit; background: var(--bg); color: var(--fg);
+  border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px;
+}
+.ai-form-actions { display: flex; gap: 8px; }
 footer {
   margin-top: 16px;
   display: flex; justify-content: space-between;

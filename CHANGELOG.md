@@ -6,6 +6,59 @@ breaking changes may bump the minor version.
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-07-21
+
+### One-click setup & auto-detect
+
+The app now configures itself with a single click instead of requiring
+hand-edited environment variables.
+
+- **“Auto-configure & start” button.** A new **Setup & Status** card at the top
+  of the desktop dashboard probes the local environment (is Ollama running? is
+  an AI key set? is the bridge up? is there a profile / CV?) and applies the
+  best available AI option — Ollama (offline, free) > your key > the built-in
+  Mock heuristic — then shows a green checklist for **Bridge · AI · Profile · CV**.
+- **One-click settings changes.** Chips switch AI provider live (Mock / Ollama /
+  My key) with **no restart** — the bridge applies settings to its own process
+  env and the next tool call picks them up. A collapsible **AI settings** form
+  sets model, base URL, and API key.
+- **Persisted settings (SQLite `meta` kv).** AI provider/model/base-URL/key are
+  now stored locally and survive restarts. Precedence: a persisted value
+  overrides the environment; an empty persisted value falls back to env — so
+  env-only users (v0.3.0 and earlier) are unaffected.
+- **New bridge endpoints** (`src/http.ts`, bearer-gated like `/call` when a
+  token is set): `GET /detect` (a single `SystemReport`: bridge + AI
+  reachability + profile/CV presence + plan), `GET /settings` (current settings,
+  **API key masked**), `POST /settings` (validate + persist + apply live). The
+  raw API key is never returned by any read path. `handle` is now exported
+  (additive, mirrors `allowedOrigin`) so tests can drive the bridge in-process.
+- **`system_check` MCP tool.** Returns the same `SystemReport` as `/detect` so
+  MCP clients (Claude Desktop / Code / Cursor) can verify the environment and
+  tell the user what to fix. Tool count 40 → 41.
+- **Detection module** (`src/lib/detect.ts` + `detect-probe.ts`): a pure async
+  `probeOllama` (loopback only, keyless, ~1.5s timeout, never throws) +
+  `buildSystemReport` shared by the endpoint and the tool.
+- **Quickstart replaces the long guide.** `docs/QUICKSTART.pdf` (1 page) focuses
+  on install → click “Auto-configure & start” → done. The old 13-page
+  `USAGE_GUIDE.*` was removed (the README already lists tools).
+
+### Security & compatibility notes
+- **AI key relaxation (documented):** previously env-only, the API key may now
+  be stored in the local SQLite `meta` table. It is **masked on every read**
+  (`/settings`, `system_check`, the UI), never written to logs
+  (`applyPersistedSettingsToEnv` returns only key *names*), and never sent
+  off-machine — the only new network touch is the loopback Ollama probe, which
+  is keyless. The desktop renderer receives the loopback bearer token via
+  `bridge:info` so it can authorize `/detect` & `/settings` when the bridge is
+  token-gated; this is acceptable on a single-user local/sandboxed app (the
+  renderer already calls `/call`, so the threat model is unchanged).
+- **Backward compatible:** empty settings store → bridge behaves identically to
+  v0.3.0. No new egress beyond the loopback Ollama probe. Submission gating
+  unchanged (still approval-gated, manual, no CAPTCHA bypass).
+- Test suite 101 → 134 (33 new: settings pure/store, detect, http endpoints,
+  system_check). All schema changes additive (reused `meta`); no user-data
+  deletion.
+
 ## [0.3.0] — 2026-07-20
 
 ### Windows distribution + auto-update + fit-and-finish (Windows roadmap Phase 4)
