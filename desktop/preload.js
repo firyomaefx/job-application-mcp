@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld("jobMcp", {
   bridgeRestart: () => ipcRenderer.invoke("bridge:restart"),
   bridgeInfo: () => ipcRenderer.invoke("bridge:info"),
   openDataDir: () => ipcRenderer.invoke("data:openDir"),
+  exportPdf: (payload) => ipcRenderer.invoke("export:pdf", payload),
   onStatus: (cb) => {
     const handler = (_e, payload) => cb(payload);
     ipcRenderer.on("bridge:status", handler);

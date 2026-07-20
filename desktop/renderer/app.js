@@ -11,6 +11,8 @@ const els = {
   appCount: document.getElementById("app-count"),
   error: document.getElementById("error"),
   bridgeUrl: document.getElementById("bridge-url"),
+  cvSelect: document.getElementById("cv-select"),
+  exportPdf: document.getElementById("export-pdf"),
 };
 
 let baseUrl = "http://127.0.0.1:8787";
@@ -40,18 +42,57 @@ async function call(name, args) {
 async function refresh() {
   setError("");
   try {
-    const [profileRes, appsRes] = await Promise.all([
+    const [profileRes, appsRes, cvsRes] = await Promise.all([
       call("get_profile", {}),
       call("list_applications", {}),
+      call("list_cvs", {}),
     ]);
     renderProfile(profileRes.data);
     renderApps(appsRes.data);
+    renderCvSelect(cvsRes.data);
   } catch (e) {
     setError(`Could not reach bridge: ${e.message}. Click "Restart bridge" or run "npm run serve:http".`);
     clearEl(els.profile, "span", "—", "muted");
     const tr = document.createElement("tr");
     tr.append(td("—", 5, "muted"));
     els.appsBody.replaceChildren(tr);
+    els.cvSelect.replaceChildren();
+  }
+}
+
+function renderCvSelect(cvs) {
+  els.cvSelect.replaceChildren();
+  if (!cvs || !cvs.length) {
+    const opt = document.createElement("option");
+    opt.textContent = "No CVs yet — use parse_cv.";
+    opt.value = "";
+    els.cvSelect.append(opt);
+    els.exportPdf.disabled = true;
+    return;
+  }
+  els.exportPdf.disabled = false;
+  for (const c of cvs) {
+    const opt = document.createElement("option");
+    opt.value = String(c.id);
+    opt.textContent = `#${c.id} — ${c.label}`;
+    els.cvSelect.append(opt);
+  }
+}
+
+async function exportCvPdf() {
+  setError("");
+  const cvId = Number(els.cvSelect.value);
+  if (!cvId) { setError("Select a CV first."); return; }
+  try {
+    const res = await call("export_cv_markdown", { cv_id: cvId, include_cover_letter: false });
+    const markdown = res?.data?.markdown;
+    if (!markdown) { setError("No markdown returned from export_cv_markdown."); return; }
+    const out = await window.jobMcp.exportPdf({ markdown });
+    if (out && out.ok) setError(`Exported PDF: ${out.path}`);
+    else if (out && out.canceled) setError("");
+    else setError("PDF export failed.");
+  } catch (e) {
+    setError(`Export failed: ${e.message}`);
   }
 }
 
@@ -152,6 +193,7 @@ function shortDate(iso) {
 els.refresh.addEventListener("click", refresh);
 els.restart.addEventListener("click", async () => { await window.jobMcp.bridgeRestart(); setTimeout(refresh, 800); });
 els.openData.addEventListener("click", () => window.jobMcp.openDataDir());
+els.exportPdf.addEventListener("click", exportCvPdf);
 
 // initial info + first refresh
 (async () => {

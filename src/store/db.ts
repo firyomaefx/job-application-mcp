@@ -177,12 +177,33 @@ function migrate(db: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_aiusage_created ON ai_usage(created_at);
   `);
 
+  // ── schema v4: CV versioning (Phase 2) ─────────────────────────────────
+  // Additive: parent_cv_id links a revised CV to its predecessor; is_active
+  // marks the current version in a chain; updated_at records the edit time.
+  // Existing rows are backfilled (parent_cv_id NULL, is_active 1, updated_at =
+  // created_at). Backward-compatible; no data loss.
+  addColumnIfMissing(db, "cvs", "parent_cv_id", "INTEGER");
+  addColumnIfMissing(db, "cvs", "is_active", "INTEGER NOT NULL DEFAULT 1");
+  addColumnIfMissing(db, "cvs", "updated_at", "TEXT");
+  db.exec("UPDATE cvs SET is_active = 1 WHERE is_active IS NULL");
+  db.exec("UPDATE cvs SET updated_at = created_at WHERE updated_at IS NULL");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_cvs_parent ON cvs(parent_cv_id)");
+
   const row = db.prepare("SELECT value FROM meta WHERE key = ?").get("schema_version") as
     | { value: string }
     | undefined;
   const current = row ? Number(row.value) : 0;
-  if (current < 3) {
-    db.prepare("INSERT OR REPLACE INTO meta(key, value) VALUES (?, '3')").run("schema_version");
+  if (current < 4) {
+    db.prepare("INSERT OR REPLACE INTO meta(key, value) VALUES (?, '4')").run("schema_version");
+  }
+}
+
+/** Add a column to a table only if it does not already exist (SQLite has no
+ *  ADD COLUMN IF NOT EXISTS). Used for additive, backward-compatible migrations. */
+function addColumnIfMissing(db: DatabaseSync, table: string, column: string, type: string): void {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (!cols.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
   }
 }
 

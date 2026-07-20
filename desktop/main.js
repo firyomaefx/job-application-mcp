@@ -165,6 +165,77 @@ ipcMain.handle("data:openDir", () => {
   shell.openPath(dir);
 });
 
+// PDF export: the renderer passes Markdown (from the export_cv_markdown tool,
+// fetched from the local bridge). We render it to a hidden, sandboxed
+// BrowserWindow and print to PDF — zero extra npm dependency (Electron's own
+// printToPDF). The user picks the save path. The Markdown is the user's OWN
+// local CV text; we still escape it before the conservative MD→HTML conversion
+// so nothing can break out of the document.
+ipcMain.handle("export:pdf", async (_e, payload) => {
+  const { markdown } = payload || {};
+  if (!markdown) throw new Error("No markdown provided for PDF export.");
+  const { BrowserWindow, dialog } = require("electron");
+  const { canceled, filePath } = await dialog.showSaveDialog(win, {
+    title: "Export as PDF",
+    defaultPath: "cv.pdf",
+    filters: [{ name: "PDF", extensions: ["pdf"] }],
+  });
+  if (canceled || !filePath) return { ok: false, canceled: true };
+
+  const html = buildPrintableHtml(markdown);
+  const printWin = new BrowserWindow({
+    show: false,
+    webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false },
+  });
+  try {
+    await printWin.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(html));
+    await printWin.webContents.executeJavaScript("window.__ready = true");
+    const pdf = await printWin.webContents.printToPDF({ printBackground: true, pageSize: "A4" });
+    fs.writeFileSync(filePath, pdf);
+    return { ok: true, path: filePath };
+  } finally {
+    printWin.destroy();
+  }
+});
+
+/** Build a self-contained printable HTML doc from Markdown. Escapes all text,
+ *  then applies a conservative subset (headings, bold, inline code, blockquote,
+ *  paragraph). No remote resources. Exported for a future desktop test. */
+function buildPrintableHtml(markdown) {
+  function esc(s) {
+    return String(s).replace(/[&<>]/g, (c) => (c === "&" ? "&amp;" : c === "<" ? "&lt;" : "&gt;"));
+  }
+  function inline(s) {
+    return esc(s)
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/(^|[\s(])\*([^*]+)\*/g, "$1<em>$2</em>");
+  }
+  const lines = String(markdown).split("\n");
+  const out = [];
+  for (const l of lines) {
+    if (/^#\s/.test(l)) out.push("<h1>" + inline(l.replace(/^#\s+/, "")) + "</h1>");
+    else if (/^##\s/.test(l)) out.push("<h2>" + inline(l.replace(/^##\s+/, "")) + "</h2>");
+    else if (/^>\s/.test(l)) out.push("<blockquote>" + inline(l.replace(/^>\s+/, "")) + "</blockquote>");
+    else if (/^\s*$/.test(l)) out.push("");
+    else out.push("<p>" + inline(l) + "</p>");
+  }
+  const body = out.join("\n");
+  return (
+    '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Export</title>' +
+    "<style>" +
+    "body{font:14px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:780px;margin:32px auto;padding:0 24px;color:#0f172a}" +
+    "h1{font-size:24px;border-bottom:2px solid #4f46e5;padding-bottom:6px}" +
+    "h2{font-size:16px;margin-top:20px;color:#334155}" +
+    "code{background:#f1f5f9;padding:1px 4px;border-radius:4px;font-size:12px}" +
+    "blockquote{border-left:3px solid #4f46e5;margin:0;padding:2px 12px;color:#475569;background:#f8fafc}" +
+    "p{margin:6px 0}" +
+    "</style></head><body>" +
+    body +
+    "</body></html>"
+  );
+}
+
 app.whenReady().then(() => {
   createWindow();
   startBridge();

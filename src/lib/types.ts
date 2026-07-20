@@ -23,6 +23,12 @@ export interface Cv {
   source_path: string | null;
   text: string;
   created_at: string;
+  // Phase 2: versioning. parent_cv_id links a revised CV to its predecessor;
+  // is_active marks the current version in the chain; updated_at records the
+  // last edit. Older rows (pre-v4) have parent_cv_id NULL and is_active 1.
+  parent_cv_id: number | null;
+  is_active: number; // 0 | 1 (SQLite has no native bool)
+  updated_at: string;
 }
 
 export interface Job {

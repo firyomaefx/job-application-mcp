@@ -1,11 +1,12 @@
 import type { AnyTool } from "./types.js";
 import { getProfileTool, updateProfileTool } from "./profile.js";
-import { parseCvTool, listCvsTool } from "./cv.js";
+import { parseCvTool, listCvsTool, updateCvTool, listCvVersionsTool, exportCvMarkdownTool } from "./cv.js";
 import { analyzeJobTool, getJobTool } from "./job.js";
 import { matchCvTool, tailorCvTool, coverLetterTool, draftAnswerTool } from "./matching.js";
 import {
   saveApplicationTool,
   listApplicationsTool,
+  updateApplicationTool,
   updateStatusTool,
   autofillFormTool,
 } from "./application.js";
@@ -27,6 +28,9 @@ export const tools: AnyTool[] = [
   updateProfileTool,
   parseCvTool,
   listCvsTool,
+  updateCvTool,
+  listCvVersionsTool,
+  exportCvMarkdownTool,
   // jobs + matching + prep
   analyzeJobTool,
   getJobTool,
@@ -37,6 +41,7 @@ export const tools: AnyTool[] = [
   // applications + forms
   saveApplicationTool,
   listApplicationsTool,
+  updateApplicationTool,
   updateStatusTool,
   autofillFormTool,
   requestApprovalTool,

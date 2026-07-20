@@ -6,6 +6,7 @@ import {
   getJob,
   listApplications,
   saveApplication,
+  updateApplication,
   updateApplicationStatus,
 } from "../store/applications.js";
 import { classifyField } from "../forms/fields.js";
@@ -99,6 +100,35 @@ export const updateStatusTool: ToolDef<typeof updateStatusSchema> = {
     return {
       summary: `Application ${app.id} is now '${app.status}'.`,
       data: app,
+    };
+  },
+};
+
+const updateApplicationSchema = z.object({
+  application_id: z.number().int(),
+  cv_id: z.number().int().nullable().optional(),
+  match_score: z.number().int().min(0).max(100).nullable().optional(),
+  tailored_cv_text: z.string().nullable().optional(),
+  cover_letter: z.string().nullable().optional(),
+  answers: z.record(z.string(), z.string()).optional(),
+  notes: z.string().nullable().optional(),
+});
+
+export const updateApplicationTool: ToolDef<typeof updateApplicationSchema> = {
+  name: "update_application",
+  description:
+    "Edit an existing application's content fields — tailored CV text, cover letter, screening " +
+    "answers, notes, cv_id, or match_score. Only provided fields change; others are preserved. " +
+    "Does NOT change status (use update_application_status) and does NOT submit anything.",
+  inputSchema: updateApplicationSchema,
+  run: (input) => {
+    const { application_id, ...fields } = input;
+    const app = updateApplication(application_id, fields);
+    if (!app) return { summary: `Application ${application_id} not found.` };
+    return {
+      summary: `Updated application ${app.id} (job ${app.job_id}).`,
+      data: app,
+      notes: ["Content fields updated; status unchanged. Submission still requires manual action + approval."],
     };
   },
 };
