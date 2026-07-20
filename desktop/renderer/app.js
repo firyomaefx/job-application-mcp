@@ -48,50 +48,101 @@ async function refresh() {
     renderApps(appsRes.data);
   } catch (e) {
     setError(`Could not reach bridge: ${e.message}. Click "Restart bridge" or run "npm run serve:http".`);
-    els.profile.innerHTML = '<span class="muted">—</span>';
-    els.appsBody.innerHTML = '<tr><td colspan="5" class="muted">—</td></tr>';
+    clearEl(els.profile, "span", "—", "muted");
+    const tr = document.createElement("tr");
+    tr.append(td("—", 5, "muted"));
+    els.appsBody.replaceChildren(tr);
   }
 }
 
+/** Build a single <dd> row: <dt>label</dt><dd>value</dd>. */
+function dlRow(label, value) {
+  const dt = document.createElement("dt");
+  dt.textContent = label;
+  const dd = document.createElement("dd");
+  dd.textContent = value == null || value === "" ? "—" : String(value);
+  return [dt, dd];
+}
+
 function renderProfile(p) {
-  if (!p) { els.profile.innerHTML = '<span class="muted">No profile.</span>'; return; }
-  const skills = (p.skills || []).map((s) => `<span class="skill"></span>`).join("");
-  els.profile.innerHTML = `
-    <dl>
-      <dt>Name</dt><dd></dd>
-      <dt>Headline</dt><dd>${escapeHtml(p.headline || "—")}</dd>
-      <dt>Email</dt><dd>${escapeHtml(p.email || "—")}</dd>
-      <dt>Location</dt><dd>${escapeHtml(p.location || "—")}</dd>
-      <dt>Experience</dt><dd>${p.experience_years ?? "—"} yrs</dd>
-      <dt>Skills</dt><dd><div class="skills">${skills || '<span class="muted">none</span>'}</div></dd>
-    </dl>`;
-  // set text via DOM to avoid HTML injection in skill chips
-  const nameDd = els.profile.querySelector("dl dd");
-  nameDd.textContent = p.full_name || "—";
-  els.profile.querySelectorAll(".skill").forEach((chip, i) => (chip.textContent = p.skills[i]));
+  if (!p) { clearEl(els.profile, "span", "No profile.", "muted"); return; }
+  const dl = document.createElement("dl");
+  dl.append(
+    ...dlRow("Name", p.full_name || "—"),
+    ...dlRow("Headline", p.headline || "—"),
+    ...dlRow("Email", p.email || "—"),
+    ...dlRow("Location", p.location || "—"),
+    ...dlRow("Experience", p.experience_years == null ? "—" : `${p.experience_years} yrs`),
+  );
+  // Skills row with chips (textContent — never innerHTML).
+  const dt = document.createElement("dt"); dt.textContent = "Skills";
+  const dd = document.createElement("dd");
+  const skillsWrap = document.createElement("div"); skillsWrap.className = "skills";
+  const skills = Array.isArray(p.skills) ? p.skills : [];
+  if (skills.length) {
+    for (const s of skills) {
+      const chip = document.createElement("span"); chip.className = "skill";
+      chip.textContent = String(s);
+      skillsWrap.append(chip);
+    }
+  } else {
+    const m = document.createElement("span"); m.className = "muted"; m.textContent = "none";
+    skillsWrap.append(m);
+  }
+  dd.append(skillsWrap);
+  dl.append(dt, dd);
+  els.profile.replaceChildren(dl);
 }
 
 function renderApps(apps) {
   els.appCount.textContent = apps.length ? `(${apps.length})` : "";
+  els.appsBody.replaceChildren();
   if (!apps.length) {
-    els.appsBody.innerHTML = '<tr><td colspan="5" class="muted">No applications yet. Use the MCP tools to create one.</td></tr>';
+    const tr = document.createElement("tr");
+    tr.append(td("No applications yet. Use the MCP tools to create one.", 5, "muted"));
+    els.appsBody.append(tr);
     return;
   }
-  els.appsBody.innerHTML = apps
-    .map(
-      (a) => `<tr>
-        <td>${a.id}</td>
-        <td>job #${a.job_id}</td>
-        <td><span class="badge ${a.status}">${a.status}</span></td>
-        <td>${a.match_score ?? "—"}${a.match_score != null ? "/100" : ""}</td>
-        <td class="muted">${shortDate(a.updated_at)}</td>
-      </tr>`
-    )
-    .join("");
+  for (const a of apps) {
+    const tr = document.createElement("tr");
+    const badge = document.createElement("span");
+    // status is a known enum locally, but treat it as untrusted text + sanitize the class
+    badge.className = "badge " + sanitizeStatusClass(a.status);
+    badge.textContent = a.status ?? "";
+    tr.append(
+      td(a.id),
+      td(`job #${a.job_id}`),
+      wrapTd(badge),
+      td(a.match_score == null ? "—" : `${a.match_score}/100`),
+      td(shortDate(a.updated_at), null, "muted"),
+    );
+    els.appsBody.append(tr);
+  }
 }
 
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+/** A <td> with optional colspan + class; value set via textContent. */
+function td(value, colspan, cls) {
+  const c = document.createElement("td");
+  if (colspan) c.colSpan = colspan;
+  if (cls) c.className = cls;
+  c.textContent = value == null ? "" : String(value);
+  return c;
+}
+function wrapTd(node) {
+  const c = document.createElement("td");
+  c.append(node);
+  return c;
+}
+/** Replace an element's children with a single text node element of the given tag/class. */
+function clearEl(parent, tag, text, cls) {
+  const el = document.createElement(tag);
+  if (cls) el.className = cls;
+  el.textContent = text;
+  parent.replaceChildren(el);
+}
+/** Only allow a-z0-9 and - in a class suffix derived from data. */
+function sanitizeStatusClass(s) {
+  return String(s ?? "").replace(/[^a-z0-9-]/gi, "");
 }
 function shortDate(iso) {
   if (!iso) return "—";

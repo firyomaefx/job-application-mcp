@@ -139,6 +139,12 @@ function createWindow() {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
+      // L2: run the renderer in the Electron sandbox. The preload still works
+      // (contextBridge is sandbox-safe) and exposes only the `jobMcp` surface.
+      // The renderer has no Node access either way; sandbox adds a hard floor.
+      sandbox: true,
+      // L3: deny new windows/Webview and pepper 3D; the app is a single dashboard.
+      javascript: true,
     },
   });
 
