@@ -6,6 +6,26 @@ breaking changes may bump the minor version.
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-07-20
+
+### CV versioning + export + application editing (Windows roadmap Phase 2)
+
+- **CV versioning (schema v4, additive).** Revising a CV now creates a new
+  version instead of overwriting: `update_cv` inserts a new row linked via
+  `parent_cv_id`, makes it the sole active version of its chain, and preserves
+  every prior version's text. `list_cv_versions` shows the full chain;
+  `list_cvs` returns active versions only by default (`include_history=true`
+  for all). No data is ever deleted.
+- **Application editing.** New `update_application` tool edits an existing
+  application's tailored CV text, cover letter, screening answers, notes,
+  cv_id, or match_score (status unchanged; nothing is submitted).
+- **Export.** New `export_cv_markdown` tool renders a CV (optionally with a
+  cover letter tailored to a job) to Markdown via a pure, tested exporter.
+  The desktop app adds an **Export to PDF** button that renders Markdown to a
+  hidden sandboxed window and prints to PDF (Electron `printToPDF`, no new
+  npm dependency; Markdown text is escaped before conversion).
+- Tool count 28 → 32; test suite 85 → 90.
+
 ## [0.2.0] — 2026-07-20
 
 ### Local AI + browser job import + desktop hardening (Windows roadmap Phase 1)

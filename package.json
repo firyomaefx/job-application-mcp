@@ -1,6 +1,6 @@
 {
   "name": "job-application-mcp",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "Local-first, open-source job application assistant built on the Model Context Protocol. Free community core.",
   "license": "AGPL-3.0-or-later",
