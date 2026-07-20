@@ -6,6 +6,31 @@ breaking changes may bump the minor version.
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-07-20
+
+### Local AI + browser job import + desktop hardening (Windows roadmap Phase 1)
+
+- **Local AI via Ollama (fully offline, no key, no cost).** Set
+  `AI_PROVIDER=ollama` (no `AI_API_KEY` needed). Reuses the OpenAI-compatible
+  transport against `http://localhost:11434/v1` (default model `llama3.1`,
+  overridable via `AI_MODEL`/`AI_BASE_URL`). Ollama calls cost $0 and never take
+  the Pro-hosted credit path. `--ai <provider>` CLI convenience flag for
+  `serve`/`serve:http`. The shared `<untrusted>` prompt framing still applies.
+- **Extension: detect + one-click job import.** A content script now runs on
+  common job-board URLs, extracts the posting (JSON-LD `JobPosting` preferred,
+  `<title>`/body fallback) via a pure, tested extractor, and the popup offers
+  "Import this job" → "Analyze & save job", which POSTs to the existing
+  `analyze_job` tool on your local bridge. Nothing leaves the machine except to
+  your own `127.0.0.1` bridge. Background relay stores the detected job +
+  sets a badge, and re-detects on SPA navigations.
+- **Security: extension token storage (L4).** The bridge bearer token moved
+  from `chrome.storage.sync` to `chrome.storage.local` (one-time migration) so a
+  local secret is not synced to your Chrome account.
+- **Security: desktop hardening (L2/L3).** Electron renderer now runs in the
+  sandbox; all `innerHTML` usage in the renderer replaced with safe DOM
+  construction (no XSS surface; status-derived class suffixes sanitized).
+- Test suite 72 → 85 (13 new: Ollama provider behaviour + job extractor).
+
 ## [0.1.3] — 2026-07-20
 
 ### Production-readiness hardening (Cycle 2 audit)
