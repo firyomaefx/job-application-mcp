@@ -1,0 +1,51 @@
+# winget manifest for Job Application MCP (reference).
+#
+# This is the manifest submitted (via PR) to microsoft/winget-pkgs; it is kept
+# in-repo as a reference and is NOT published automatically. winget validation
+# requires an MSIX (preferred) or NSIS installer asset from a GitHub release.
+#
+# IMPORTANT: until a code-signing certificate is obtained, the installers are
+# UNSIGNED. winget/SmarScreen will warn on first install; users must confirm.
+# Do not present unsigned builds as signed.
+#
+# Reference: https://github.com/microsoft/winget-pkgs
+
+PackageIdentifier: JobApplicationMCP.Desktop
+PackageVersion: 0.3.0
+PackageLocale: en-US
+Publisher: Job Application MCP contributors
+PublisherUrl: https://github.com/firyomaefx/job-application-mcp
+PublisherSupportUrl: https://github.com/firyomaefx/job-application-mcp/issues
+PackageName: Job Application MCP
+PackageUrl: https://github.com/firyomaefx/job-application-mcp
+License: AGPL-3.0-or-later
+LicenseUrl: https://github.com/firyomaefx/job-application-mcp/blob/main/LICENSE
+Copyright: (c) Job Application MCP contributors. AGPL-3.0-or-later.
+ShortDescription: Local-first, open-source job application assistant built on the Model Context Protocol.
+Description: |
+  A Windows desktop application that helps you prepare job applications
+  locally — parse CVs, analyze job postings, score match, tailor CV/cover
+  letters (optionally with a local Ollama model or your own AI key), manage a
+  job inbox, and export to PDF. Nothing is uploaded: the bridge is loopback-only.
+  Submission is always manual and user-approved.
+Moniker: job-application-mcp
+Tags:
+  - mcp
+  - jobs
+  - careers
+  - resume
+  - local-first
+  - electron
+# Requires a packaged installer asset from a GitHub release. Until then this
+# block is illustrative; fill the SHA256 from the actual release asset.
+Installers:
+  - InstallerLocale: en-US
+    Architecture: x64
+    InstallerType: msix
+    InstallerUrl: https://github.com/firyomaefx/job-application-mcp/releases/download/v0.3.0/Job-Application-MCP-0.3.0.msix
+    InstallerSha256: REPLACE_WITH_RELEASE_ASSET_SHA256
+    ProductCode: JobApplicationMCP.Desktop
+    Capabilities:
+      - runFullTrust
+ManifestType: singleton
+ManifestVersion: 1.6.0

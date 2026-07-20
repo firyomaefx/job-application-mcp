@@ -6,6 +6,43 @@ breaking changes may bump the minor version.
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-07-20
+
+### Windows distribution + auto-update + fit-and-finish (Windows roadmap Phase 4)
+
+- **Distribution targets.** The Electron builder now emits both a per-user
+  **NSIS** installer and an **MSIX** package for Windows (`desktop/package.json`
+  `win.target`). MSIX identity configured (`JobApplicationMCP.Desktop`); NSIS is
+  non-one-click, per-user, with a configurable install directory. A reference
+  **winget manifest** lives at `packaging/winget/JobApplicationMCP.yaml` (submit
+  to `microsoft/winget-pkgs` manually — not automated by CI).
+- **Auto-update (electron-updater).** `desktop/main.js` now wires
+  `electron-updater` (guarded, packaged-only; never crashes the app if absent).
+  On a packaged build it checks the GitHub Releases feed, downloads, and prompts
+  via an in-app banner. **Nothing installs without the user clicking
+  "Install & restart"** (`update:install` IPC). The update-decision is a pure,
+  tested helper (`desktop/version-util.js` `parseVer`/`isUpdateAvailable`) so a
+  malformed remote feed never prompts, downgrades, or loops. Update checks
+  contact `github.com` (public feed) — documented as opt-out.
+- **Windows fit-and-finish.** Stable `AppUserModelId` for taskbar grouping,
+  jump lists (`setUserTasks`: "Open Inbox", "New CV"), system light/dark theme
+  via `nativeTheme`, an acrylic backdrop on Win11, and an optional tray with a
+  context menu. Jump-list flags deep-link to the relevant section.
+- **PowerShell module.** `packaging/powershell/JobMcp.psd1` + `.psm1` wrap the
+  `job-mcp` CLI for Windows power users: `Start-JobMcpBridge`, `Stop-JobMcpBridge`,
+  `Get-JobMcpStatus`, `Import-Job`, `Get-JobInbox`. Talks to the loopback bridge
+  only — no direct network egress.
+- **Security.** Auto-update install requires explicit user consent; tray is
+  optional. No CV text/PII is sent to the update feed (only the app version +
+  GitHub release metadata).
+- ⚠️ **Code-signing certificate gap (documented, not shipped-as-signed).** The
+  MSIX/NSIS installers are **unsigned** until a paid external code-signing
+  certificate is obtained. SmartScreen will warn on first install, and MSIX
+  requires developer unlock without a trusted cert. See
+  `packaging/README.md`. We do not claim the build is signed anywhere in the UI
+  or docs.
+- Tool count unchanged (39); test suite 96 → 101 (5 new: version-compare helper).
+
 ## [0.2.2] — 2026-07-20
 
 ### Job inbox/ranking + follow-up reminders (Windows roadmap Phase 3)

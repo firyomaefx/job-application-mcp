@@ -15,6 +15,10 @@ const els = {
   exportPdf: document.getElementById("export-pdf"),
   reminders: document.getElementById("reminders"),
   reminderCount: document.getElementById("reminder-count"),
+  updateBanner: document.getElementById("update-banner"),
+  updateVersion: document.getElementById("update-version"),
+  updateInstall: document.getElementById("update-install"),
+  updateDismiss: document.getElementById("update-dismiss"),
 };
 
 let baseUrl = "http://127.0.0.1:8787";
@@ -232,3 +236,36 @@ els.exportPdf.addEventListener("click", exportCvPdf);
   if (info?.url) { baseUrl = info.url; els.bridgeUrl.textContent = info.url; }
   refresh();
 })();
+
+// ── Auto-update prompt (Phase 4) ─────────────────────────────
+// Nothing installs without the user clicking "Install & restart". The main
+// process only emits update:available after the version-compare helper
+// confirms the remote is strictly newer.
+window.jobMcp.onUpdateAvailable(({ version }) => {
+  els.updateVersion.textContent = version || "newer build";
+  els.updateBanner.hidden = false;
+});
+els.updateInstall.addEventListener("click", async () => {
+  els.updateInstall.disabled = true;
+  els.updateInstall.textContent = "Installing…";
+  try {
+    const r = await window.jobMcp.installUpdate();
+    if (!r?.ok) {
+      setError(`Update not available: ${r?.reason || "auto-updater unavailable"}.`);
+      els.updateInstall.disabled = false;
+      els.updateInstall.textContent = "Install & restart";
+    }
+  } catch (e) {
+    setError(`Update failed: ${e.message}`);
+    els.updateInstall.disabled = false;
+    els.updateInstall.textContent = "Install & restart";
+  }
+});
+els.updateDismiss.addEventListener("click", () => { els.updateBanner.hidden = true; });
+
+// ── Jump-list deep link (Phase 4) ─────────────────────────────
+// `--open-inbox` from a jump-list task scrolls to the reminders section.
+const intent = window.jobMcp.launchIntent?.();
+if (intent === "open-inbox") {
+  document.getElementById("reminders")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}

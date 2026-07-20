@@ -10,11 +10,26 @@
 // from the repo root, after `npm run build`). Packaged: electron-builder
 // ships it as an extraResource under process.resourcesPath.
 
-const { app, BrowserWindow, ipcMain, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, nativeTheme, Tray, Menu, nativeImage } = require("electron");
 const { spawn } = require("node:child_process");
 const path = require("node:path");
 const fs = require("node:fs");
 const http = require("node:http");
+const { isUpdateAvailable } = require("./version-util.js");
+
+// Auto-update is wired defensively: electron-updater is a dev dependency that
+// the CI build installs; if it is absent (e.g. a dev machine without it), we
+// skip auto-update rather than crash. The GitHub publish provider in
+// desktop/package.json feeds the update channel; the user is asked before
+// installing and the check is opt-out.
+let autoUpdater = null;
+try {
+  // Only load in a packaged build (dev runs have no valid publish context and
+  // would hit the network pointlessly).
+  if (app.isPackaged) autoUpdater = require("electron-updater").autoUpdater;
+} catch {
+  autoUpdater = null;
+}
 
 // Resolve the repo root from this file's location: desktop/ -> ..
 const REPO_ROOT = path.resolve(__dirname, "..");
@@ -135,6 +150,8 @@ function createWindow() {
     height: 680,
     title: "Job Application MCP",
     backgroundColor: "#0f172a",
+    // Windows 11 acrylic backdrop (falls back to backgroundColor elsewhere).
+    backgroundMaterial: process.platform === "win32" ? "acrylic" : "none",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -143,7 +160,6 @@ function createWindow() {
       // (contextBridge is sandbox-safe) and exposes only the `jobMcp` surface.
       // The renderer has no Node access either way; sandbox adds a hard floor.
       sandbox: true,
-      // L3: deny new windows/Webview and pepper 3D; the app is a single dashboard.
       javascript: true,
     },
   });
@@ -237,12 +253,106 @@ function buildPrintableHtml(markdown) {
 }
 
 app.whenReady().then(() => {
+  // Windows fit-and-finish: stable AppUserModelID for taskbar grouping + jump
+  // lists; follow the system light/dark theme; an optional tray with a menu.
+  if (process.platform === "win32") {
+    app.setAppUserModelId("io.github.jobapplicationmcp.desktop");
+    try {
+      app.setUserTasks([
+        {
+          program: process.execPath,
+          arguments: "--open-inbox",
+          iconPath: process.execPath,
+          iconIndex: 0,
+          title: "Open Inbox",
+          description: "Open the Job Application MCP inbox",
+        },
+        {
+          program: process.execPath,
+          arguments: "--new-cv",
+          iconPath: process.execPath,
+          iconIndex: 0,
+          title: "New CV",
+          description: "Launch the app to add a new CV",
+        },
+      ]);
+    } catch {
+      // setUserTasks is Windows-only; ignore elsewhere.
+    }
+  }
+  try {
+    nativeTheme.themeSource = "system";
+  } catch {
+    /* nativeTheme may be unavailable in some sandboxes; non-fatal */
+  }
   createWindow();
+  createTray();
   startBridge();
+  checkForUpdates();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
+
+let tray = null;
+function createTray() {
+  try {
+    // Minimal 1x1 transparent icon keeps the tray dependency-free; the real
+    // app icon is bundled by electron-builder. Off-by-default nicety.
+    const icon = nativeImage.createEmpty();
+    tray = new Tray(icon);
+    tray.setToolTip("Job Application MCP");
+    const menu = Menu.buildFromTemplate([
+      { label: "Open", click: () => win && win.show() },
+      { label: "Quit", click: () => app.quit() },
+    ]);
+    tray.setContextMenu(menu);
+    tray.on("click", () => win && (win.isVisible() ? win.focus() : win.show()));
+  } catch {
+    tray = null;
+  }
+}
+
+/** Check for an update via electron-updater (packaged only). Prompts the user;
+ *  nothing installs without consent. Dev/local runs are skipped. */
+function checkForUpdates() {
+  if (!autoUpdater) return;
+  try {
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = false; // ask first
+    autoUpdater.on("update-downloaded", (info) => {
+      if (!win || win.isDestroyed()) return;
+      const latest = (info && info.version) || null;
+      const verdict = isUpdateAvailable(app.getVersion(), latest);
+      if (!verdict) return; // not actually newer — don't prompt
+      win.webContents.send("update:available", { version: latest });
+    });
+    autoUpdater.checkForUpdates().catch(() => {});
+  } catch {
+    /* never let auto-update break the app */
+  }
+}
+
+// Renderer asks to install a downloaded update (user clicked "Install & restart").
+ipcMain.handle("update:install", async () => {
+  if (!autoUpdater) return { ok: false, reason: "auto-updater unavailable" };
+  try {
+    autoUpdater.quitAndInstall(false, true);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, reason: String(e && e.message || e) };
+  }
+});
+
+// Jump-list deep-link intent. setUserTasks passes `--open-inbox` / `--new-cv`
+// on the command line; we surface the first known flag to the renderer so it
+// can focus the relevant section (no tab UI yet — just a scroll target).
+const LAUNCH_FLAGS = new Set(["--open-inbox", "--new-cv"]);
+let launchIntent = null;
+for (const a of process.argv) {
+  if (LAUNCH_FLAGS.has(a)) { launchIntent = a.replace(/^--/, ""); break; }
+}
+ipcMain.on("app:launchIntent", (e) => { e.returnValue = launchIntent; });
 
 app.on("window-all-closed", () => {
   stopBridge();
