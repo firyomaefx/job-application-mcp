@@ -56,12 +56,14 @@ function migrate(db: DatabaseSync): void {
     );
 
     CREATE TABLE IF NOT EXISTS cvs (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      profile_id  INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-      label       TEXT NOT NULL,
-      source_path TEXT,
-      text        TEXT NOT NULL,
-      created_at  TEXT NOT NULL
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      profile_id      INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+      label           TEXT NOT NULL,
+      source_path     TEXT,
+      text            TEXT NOT NULL,
+      parent_cv_id    INTEGER REFERENCES cvs(id) ON DELETE SET NULL,
+      is_active       INTEGER NOT NULL DEFAULT 1,
+      created_at      TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS jobs (
