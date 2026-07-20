@@ -41,6 +41,21 @@ export interface Job {
   // Skills/keywords extracted from the description during analysis.
   keywords: string[];
   created_at: string;
+  // Phase 3: pipeline inbox status. 'new' on import; triaged/applied/archived
+  // are set by the user. Applied is also derivable from an application row.
+  inbox_status: "new" | "triaged" | "applied" | "archived";
+}
+
+export interface Reminder {
+  id: number;
+  profile_id: number;
+  application_id: number | null;
+  job_id: number | null;
+  kind: "follow_up" | "interview" | "custom";
+  title: string;
+  due_at: string; // ISO date
+  done: number; // 0 | 1
+  created_at: string;
 }
 
 export type ApplicationStatus =

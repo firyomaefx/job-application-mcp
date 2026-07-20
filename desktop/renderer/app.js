@@ -13,6 +13,8 @@ const els = {
   bridgeUrl: document.getElementById("bridge-url"),
   cvSelect: document.getElementById("cv-select"),
   exportPdf: document.getElementById("export-pdf"),
+  reminders: document.getElementById("reminders"),
+  reminderCount: document.getElementById("reminder-count"),
 };
 
 let baseUrl = "http://127.0.0.1:8787";
@@ -42,14 +44,16 @@ async function call(name, args) {
 async function refresh() {
   setError("");
   try {
-    const [profileRes, appsRes, cvsRes] = await Promise.all([
+    const [profileRes, appsRes, cvsRes, dueRes] = await Promise.all([
       call("get_profile", {}),
       call("list_applications", {}),
       call("list_cvs", {}),
+      call("due_reminders", {}),
     ]);
     renderProfile(profileRes.data);
     renderApps(appsRes.data);
     renderCvSelect(cvsRes.data);
+    renderReminders(dueRes.data);
   } catch (e) {
     setError(`Could not reach bridge: ${e.message}. Click "Restart bridge" or run "npm run serve:http".`);
     clearEl(els.profile, "span", "—", "muted");
@@ -57,7 +61,34 @@ async function refresh() {
     tr.append(td("—", 5, "muted"));
     els.appsBody.replaceChildren(tr);
     els.cvSelect.replaceChildren();
+    els.reminders.replaceChildren(clearElLi("No reminders (bridge offline).", "muted"));
   }
+}
+
+function renderReminders(due) {
+  els.reminders.replaceChildren();
+  els.reminderCount.textContent = due && due.length ? `(${due.length} due)` : "";
+  if (!due || !due.length) {
+    els.reminders.append(clearElLi("No reminders due.", "muted"));
+    return;
+  }
+  for (const r of due) {
+    const li = document.createElement("li");
+    const title = document.createElement("strong");
+    title.textContent = r.title;
+    const meta = document.createElement("span");
+    meta.className = "muted";
+    meta.textContent = ` — due ${shortDate(r.due_at)} (${r.kind})`;
+    li.append(title, meta);
+    els.reminders.append(li);
+  }
+}
+
+function clearElLi(text, cls) {
+  const li = document.createElement("li");
+  if (cls) li.className = cls;
+  li.textContent = text;
+  return li;
 }
 
 function renderCvSelect(cvs) {

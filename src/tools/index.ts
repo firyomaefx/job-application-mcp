@@ -1,7 +1,7 @@
 import type { AnyTool } from "./types.js";
 import { getProfileTool, updateProfileTool } from "./profile.js";
 import { parseCvTool, listCvsTool, updateCvTool, listCvVersionsTool, exportCvMarkdownTool } from "./cv.js";
-import { analyzeJobTool, getJobTool } from "./job.js";
+import { analyzeJobTool, getJobTool, listJobInboxTool, rankJobsTool, triageJobTool } from "./job.js";
 import { matchCvTool, tailorCvTool, coverLetterTool, draftAnswerTool } from "./matching.js";
 import {
   saveApplicationTool,
@@ -10,6 +10,13 @@ import {
   updateStatusTool,
   autofillFormTool,
 } from "./application.js";
+import {
+  addReminderTool,
+  listRemindersTool,
+  dueRemindersTool,
+  completeReminderTool,
+  deleteReminderTool,
+} from "./reminders.js";
 import { requestApprovalTool, confirmSubmissionTool } from "./submission.js";
 import { analyticsTool, statusTool } from "./analytics.js";
 import { backupDataTool, listBackupsTool, restoreDataTool } from "./backup.js";
@@ -34,6 +41,9 @@ export const tools: AnyTool[] = [
   // jobs + matching + prep
   analyzeJobTool,
   getJobTool,
+  listJobInboxTool,
+  rankJobsTool,
+  triageJobTool,
   matchCvTool,
   tailorCvTool,
   coverLetterTool,
@@ -46,6 +56,12 @@ export const tools: AnyTool[] = [
   autofillFormTool,
   requestApprovalTool,
   confirmSubmissionTool,
+  // pipeline: reminders (Phase 3)
+  addReminderTool,
+  listRemindersTool,
+  dueRemindersTool,
+  completeReminderTool,
+  deleteReminderTool,
   // analytics + status
   analyticsTool,
   statusTool,

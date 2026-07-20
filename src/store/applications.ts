@@ -144,6 +144,42 @@ export function getJob(id: number): Job | null {
   return { ...rest, keywords };
 }
 
+// ── Job inbox (Phase 3) ────────────────────────────────────────
+
+export function listInboxJobs(
+  profileId: number,
+  status?: "new" | "triaged" | "applied" | "archived"
+): Job[] {
+  const db = openDb();
+  const rows = status
+    ? db
+        .prepare("SELECT * FROM jobs WHERE profile_id = ? AND inbox_status = ? ORDER BY id DESC")
+        .all(profileId, status)
+    : db.prepare("SELECT * FROM jobs WHERE profile_id = ? ORDER BY id DESC").all(profileId);
+  return (rows as (Omit<Job, "keywords"> & { keywords: string })[]).map((row) => {
+    let keywords: string[] = [];
+    try {
+      keywords = JSON.parse(row.keywords) as string[];
+    } catch {
+      keywords = [];
+    }
+    const { keywords: _k, ...rest } = row;
+    return { ...rest, keywords };
+  });
+}
+
+export function triageJob(
+  profileId: number,
+  jobId: number,
+  status: "new" | "triaged" | "applied" | "archived"
+): Job | null {
+  const db = openDb();
+  const existing = getJob(jobId);
+  if (!existing || existing.profile_id !== profileId) return null;
+  db.prepare("UPDATE jobs SET inbox_status = ? WHERE id = ?").run(status, jobId);
+  return getJob(jobId);
+}
+
 // ── Applications ───────────────────────────────────────────────
 
 export function saveApplication(
