@@ -1,6 +1,6 @@
 {
   "name": "job-application-mcp-desktop",
-  "version": "0.1.3",
+  "version": "0.4.0",
   "private": true,
   "description": "Desktop wrapper UI for Job Application MCP. Launches the local HTTP bridge and shows your profile, applications, and server status.",
   "license": "AGPL-3.0-or-later",
@@ -13,7 +13,8 @@
   },
   "devDependencies": {
     "electron": "^33.0.0",
-    "electron-builder": "^25.0.0"
+    "electron-builder": "^25.0.0",
+    "electron-updater": "^6.3.0"
   },
   "build": {
     "appId": "io.github.jobapplicationmcp.desktop",
@@ -29,7 +30,17 @@
       "repo": "job-application-mcp"
     },
     "mac": { "target": "dmg" },
-    "win": { "target": "nsis" },
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "msix", "arch": ["x64"] }
+      ],
+      "msix": {
+        "applicationId": "JobApplicationMCP",
+        "identityName": "JobApplicationMCP.Desktop"
+      }
+    },
+    "nsis": { "oneClick": false, "perMachine": false, "allowToChangeInstallationDirectory": true },
     "linux": { "target": "AppImage" }
   }
 }

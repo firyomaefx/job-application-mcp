@@ -1,16 +1,25 @@
 import type { AnyTool } from "./types.js";
 import { getProfileTool, updateProfileTool } from "./profile.js";
-import { parseCvTool, listCvsTool } from "./cv.js";
-import { analyzeJobTool, getJobTool } from "./job.js";
+import { parseCvTool, listCvsTool, updateCvTool, listCvVersionsTool, exportCvMarkdownTool } from "./cv.js";
+import { analyzeJobTool, getJobTool, listJobInboxTool, rankJobsTool, triageJobTool } from "./job.js";
 import { matchCvTool, tailorCvTool, coverLetterTool, draftAnswerTool } from "./matching.js";
 import {
   saveApplicationTool,
   listApplicationsTool,
+  updateApplicationTool,
   updateStatusTool,
   autofillFormTool,
 } from "./application.js";
+import {
+  addReminderTool,
+  listRemindersTool,
+  dueRemindersTool,
+  completeReminderTool,
+  deleteReminderTool,
+} from "./reminders.js";
 import { requestApprovalTool, confirmSubmissionTool } from "./submission.js";
 import { analyticsTool, statusTool } from "./analytics.js";
+import { systemCheckTool } from "./system_check.js";
 import { backupDataTool, listBackupsTool, restoreDataTool } from "./backup.js";
 import { topupCreditsTool, creditsTool, grantMonthlyTool } from "./pro.js";
 import {
@@ -27,9 +36,15 @@ export const tools: AnyTool[] = [
   updateProfileTool,
   parseCvTool,
   listCvsTool,
+  updateCvTool,
+  listCvVersionsTool,
+  exportCvMarkdownTool,
   // jobs + matching + prep
   analyzeJobTool,
   getJobTool,
+  listJobInboxTool,
+  rankJobsTool,
+  triageJobTool,
   matchCvTool,
   tailorCvTool,
   coverLetterTool,
@@ -37,13 +52,21 @@ export const tools: AnyTool[] = [
   // applications + forms
   saveApplicationTool,
   listApplicationsTool,
+  updateApplicationTool,
   updateStatusTool,
   autofillFormTool,
   requestApprovalTool,
   confirmSubmissionTool,
+  // pipeline: reminders (Phase 3)
+  addReminderTool,
+  listRemindersTool,
+  dueRemindersTool,
+  completeReminderTool,
+  deleteReminderTool,
   // analytics + status
   analyticsTool,
   statusTool,
+  systemCheckTool,
   // backup / restore (local)
   backupDataTool,
   listBackupsTool,

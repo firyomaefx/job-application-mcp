@@ -18,6 +18,20 @@
 
     <button id="capture" class="primary">Capture form fields on this page</button>
 
+    <section id="import-section">
+      <h2>Import this job</h2>
+      <p id="import-hint" class="hint">Detect the job posting on this page and send it to your local MCP for analysis.</p>
+      <button id="import" class="primary">Import this job</button>
+    </section>
+
+    <section id="job-section" hidden>
+      <h2>Detected job</h2>
+      <p><strong id="job-title"></strong></p>
+      <p id="job-meta" class="hint"></p>
+      <p id="job-desc" class="jobdesc"></p>
+      <button id="analyze" class="primary">Analyze &amp; save job</button>
+    </section>
+
     <section id="fields-section" hidden>
       <h2>Captured fields (<span id="count">0</span>)</h2>
       <ul id="fields"></ul>

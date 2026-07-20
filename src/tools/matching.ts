@@ -23,9 +23,12 @@ export async function resolveProvider(
   feature: string,
 ): Promise<{ provider: AiProvider; usedAi: boolean; proHosted: boolean }> {
   const haveKey = !!process.env.AI_API_KEY;
+  // Ollama is a keyless local model — still counts as "used AI" (real provider),
+  // but never as Pro hosted (no server-side credit path).
+  const isOllama = process.env.AI_PROVIDER?.toLowerCase() === "ollama";
   const mode = resolveAiMode(feature); // 'ai' only when Pro entitlement + balance
-  const usedAi = haveKey;
-  const proHosted = mode === "ai" && haveKey;
+  const usedAi = haveKey || isOllama;
+  const proHosted = mode === "ai" && haveKey && !isOllama;
   const provider = await getProvider({ useReal: usedAi });
   return { provider, usedAi, proHosted };
 }

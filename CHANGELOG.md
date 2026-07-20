@@ -6,6 +6,156 @@ breaking changes may bump the minor version.
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-07-21
+
+### One-click setup & auto-detect
+
+The app now configures itself with a single click instead of requiring
+hand-edited environment variables.
+
+- **“Auto-configure & start” button.** A new **Setup & Status** card at the top
+  of the desktop dashboard probes the local environment (is Ollama running? is
+  an AI key set? is the bridge up? is there a profile / CV?) and applies the
+  best available AI option — Ollama (offline, free) > your key > the built-in
+  Mock heuristic — then shows a green checklist for **Bridge · AI · Profile · CV**.
+- **One-click settings changes.** Chips switch AI provider live (Mock / Ollama /
+  My key) with **no restart** — the bridge applies settings to its own process
+  env and the next tool call picks them up. A collapsible **AI settings** form
+  sets model, base URL, and API key.
+- **Persisted settings (SQLite `meta` kv).** AI provider/model/base-URL/key are
+  now stored locally and survive restarts. Precedence: a persisted value
+  overrides the environment; an empty persisted value falls back to env — so
+  env-only users (v0.3.0 and earlier) are unaffected.
+- **New bridge endpoints** (`src/http.ts`, bearer-gated like `/call` when a
+  token is set): `GET /detect` (a single `SystemReport`: bridge + AI
+  reachability + profile/CV presence + plan), `GET /settings` (current settings,
+  **API key masked**), `POST /settings` (validate + persist + apply live). The
+  raw API key is never returned by any read path. `handle` is now exported
+  (additive, mirrors `allowedOrigin`) so tests can drive the bridge in-process.
+- **`system_check` MCP tool.** Returns the same `SystemReport` as `/detect` so
+  MCP clients (Claude Desktop / Code / Cursor) can verify the environment and
+  tell the user what to fix. Tool count 40 → 41.
+- **Detection module** (`src/lib/detect.ts` + `detect-probe.ts`): a pure async
+  `probeOllama` (loopback only, keyless, ~1.5s timeout, never throws) +
+  `buildSystemReport` shared by the endpoint and the tool.
+- **Quickstart replaces the long guide.** `docs/QUICKSTART.pdf` (1 page) focuses
+  on install → click “Auto-configure & start” → done. The old 13-page
+  `USAGE_GUIDE.*` was removed (the README already lists tools).
+
+### Security & compatibility notes
+- **AI key relaxation (documented):** previously env-only, the API key may now
+  be stored in the local SQLite `meta` table. It is **masked on every read**
+  (`/settings`, `system_check`, the UI), never written to logs
+  (`applyPersistedSettingsToEnv` returns only key *names*), and never sent
+  off-machine — the only new network touch is the loopback Ollama probe, which
+  is keyless. The desktop renderer receives the loopback bearer token via
+  `bridge:info` so it can authorize `/detect` & `/settings` when the bridge is
+  token-gated; this is acceptable on a single-user local/sandboxed app (the
+  renderer already calls `/call`, so the threat model is unchanged).
+- **Backward compatible:** empty settings store → bridge behaves identically to
+  v0.3.0. No new egress beyond the loopback Ollama probe. Submission gating
+  unchanged (still approval-gated, manual, no CAPTCHA bypass).
+- Test suite 101 → 134 (33 new: settings pure/store, detect, http endpoints,
+  system_check). All schema changes additive (reused `meta`); no user-data
+  deletion.
+
+## [0.3.0] — 2026-07-20
+
+### Windows distribution + auto-update + fit-and-finish (Windows roadmap Phase 4)
+
+- **Distribution targets.** The Electron builder now emits both a per-user
+  **NSIS** installer and an **MSIX** package for Windows (`desktop/package.json`
+  `win.target`). MSIX identity configured (`JobApplicationMCP.Desktop`); NSIS is
+  non-one-click, per-user, with a configurable install directory. A reference
+  **winget manifest** lives at `packaging/winget/JobApplicationMCP.yaml` (submit
+  to `microsoft/winget-pkgs` manually — not automated by CI).
+- **Auto-update (electron-updater).** `desktop/main.js` now wires
+  `electron-updater` (guarded, packaged-only; never crashes the app if absent).
+  On a packaged build it checks the GitHub Releases feed, downloads, and prompts
+  via an in-app banner. **Nothing installs without the user clicking
+  "Install & restart"** (`update:install` IPC). The update-decision is a pure,
+  tested helper (`desktop/version-util.js` `parseVer`/`isUpdateAvailable`) so a
+  malformed remote feed never prompts, downgrades, or loops. Update checks
+  contact `github.com` (public feed) — documented as opt-out.
+- **Windows fit-and-finish.** Stable `AppUserModelId` for taskbar grouping,
+  jump lists (`setUserTasks`: "Open Inbox", "New CV"), system light/dark theme
+  via `nativeTheme`, an acrylic backdrop on Win11, and an optional tray with a
+  context menu. Jump-list flags deep-link to the relevant section.
+- **PowerShell module.** `packaging/powershell/JobMcp.psd1` + `.psm1` wrap the
+  `job-mcp` CLI for Windows power users: `Start-JobMcpBridge`, `Stop-JobMcpBridge`,
+  `Get-JobMcpStatus`, `Import-Job`, `Get-JobInbox`. Talks to the loopback bridge
+  only — no direct network egress.
+- **Security.** Auto-update install requires explicit user consent; tray is
+  optional. No CV text/PII is sent to the update feed (only the app version +
+  GitHub release metadata).
+- ⚠️ **Code-signing certificate gap (documented, not shipped-as-signed).** The
+  MSIX/NSIS installers are **unsigned** until a paid external code-signing
+  certificate is obtained. SmartScreen will warn on first install, and MSIX
+  requires developer unlock without a trusted cert. See
+  `packaging/README.md`. We do not claim the build is signed anywhere in the UI
+  or docs.
+- Tool count unchanged (39); test suite 96 → 101 (5 new: version-compare helper).
+
+## [0.2.2] — 2026-07-20
+
+### Job inbox/ranking + follow-up reminders (Windows roadmap Phase 3)
+
+- **Job inbox.** Imported jobs now carry an inbox status (`new` / `triaged` /
+  `applied` / `archived`). New tools: `list_job_inbox`, `triage_job`, and
+  `rank_jobs`, which ranks your inbox by best application match score plus a
+  30-day recency bonus so the freshest well-matched jobs surface first
+  (pure, tested `src/lib/inbox.ts`). Archived jobs are excluded by default.
+- **Reminders.** New `add_reminder`, `list_reminders`, `due_reminders`,
+  `complete_reminder`, `delete_reminder` tools (schema v5 `reminders` table).
+  The desktop app surfaces due/overdue reminders on launch. Local-only.
+- Schema v5 (additive: jobs `inbox_status` + `reminders` table; no data loss).
+- Tool count 32 → 39; test suite 90 → 96.
+
+## [0.2.1] — 2026-07-20
+
+### CV versioning + export + application editing (Windows roadmap Phase 2)
+
+- **CV versioning (schema v4, additive).** Revising a CV now creates a new
+  version instead of overwriting: `update_cv` inserts a new row linked via
+  `parent_cv_id`, makes it the sole active version of its chain, and preserves
+  every prior version's text. `list_cv_versions` shows the full chain;
+  `list_cvs` returns active versions only by default (`include_history=true`
+  for all). No data is ever deleted.
+- **Application editing.** New `update_application` tool edits an existing
+  application's tailored CV text, cover letter, screening answers, notes,
+  cv_id, or match_score (status unchanged; nothing is submitted).
+- **Export.** New `export_cv_markdown` tool renders a CV (optionally with a
+  cover letter tailored to a job) to Markdown via a pure, tested exporter.
+  The desktop app adds an **Export to PDF** button that renders Markdown to a
+  hidden sandboxed window and prints to PDF (Electron `printToPDF`, no new
+  npm dependency; Markdown text is escaped before conversion).
+- Tool count 28 → 32; test suite 85 → 90.
+
+## [0.2.0] — 2026-07-20
+
+### Local AI + browser job import + desktop hardening (Windows roadmap Phase 1)
+
+- **Local AI via Ollama (fully offline, no key, no cost).** Set
+  `AI_PROVIDER=ollama` (no `AI_API_KEY` needed). Reuses the OpenAI-compatible
+  transport against `http://localhost:11434/v1` (default model `llama3.1`,
+  overridable via `AI_MODEL`/`AI_BASE_URL`). Ollama calls cost $0 and never take
+  the Pro-hosted credit path. `--ai <provider>` CLI convenience flag for
+  `serve`/`serve:http`. The shared `<untrusted>` prompt framing still applies.
+- **Extension: detect + one-click job import.** A content script now runs on
+  common job-board URLs, extracts the posting (JSON-LD `JobPosting` preferred,
+  `<title>`/body fallback) via a pure, tested extractor, and the popup offers
+  "Import this job" → "Analyze & save job", which POSTs to the existing
+  `analyze_job` tool on your local bridge. Nothing leaves the machine except to
+  your own `127.0.0.1` bridge. Background relay stores the detected job +
+  sets a badge, and re-detects on SPA navigations.
+- **Security: extension token storage (L4).** The bridge bearer token moved
+  from `chrome.storage.sync` to `chrome.storage.local` (one-time migration) so a
+  local secret is not synced to your Chrome account.
+- **Security: desktop hardening (L2/L3).** Electron renderer now runs in the
+  sandbox; all `innerHTML` usage in the renderer replaced with safe DOM
+  construction (no XSS surface; status-derived class suffixes sanitized).
+- Test suite 72 → 85 (13 new: Ollama provider behaviour + job extractor).
+
 ## [0.1.3] — 2026-07-20
 
 ### Production-readiness hardening (Cycle 2 audit)

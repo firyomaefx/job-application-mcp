@@ -15,13 +15,17 @@ import type { AiUsage } from "./provider.js";
 
 export type AiFeature = "ai_cv_tailoring" | "ai_cover_letter" | "ai_answer";
 export type AiStatus = "ok" | "fallback" | "failed";
-export type ProviderName = "mock" | "openai" | "anthropic";
+export type ProviderName = "mock" | "openai" | "anthropic" | "ollama";
 
-/** USD per 1000 tokens (input, output). Conservative public-list defaults. */
+/**
+ * USD per 1000 tokens (input, output). Conservative public-list defaults.
+ * `ollama` is a local model (free, runs on the user's own machine) → cost 0.
+ */
 const PRICE_TABLE: Record<ProviderName, { in: number; out: number }> = {
   mock: { in: 0, out: 0 },
   openai: { in: 0.00015, out: 0.0006 }, // gpt-4o-mini band
   anthropic: { in: 0.003, out: 0.015 }, // Claude mid band
+  ollama: { in: 0, out: 0 }, // local model — no per-token cost
 };
 
 export function priceFor(provider: ProviderName): { in: number; out: number } {

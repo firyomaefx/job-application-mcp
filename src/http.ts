@@ -15,6 +15,18 @@ import { toolByName, tools } from "./tools/index.js";
 import { openDb } from "./store/db.js";
 import { createServer as createMcpServer } from "./server.js";
 import { safeEqual } from "./lib/crypto.js";
+import { buildSystemReport } from "./lib/detect.js";
+import {
+  validateSettings,
+  maskApiKey,
+  isKeySet,
+  type SettingsPatch,
+} from "./lib/settings.js";
+import {
+  readAllSettings,
+  writeSettings,
+  applyPersistedSettingsToEnv,
+} from "./store/settings.js";
 
 const PORT = Number(process.env.JOB_MCP_HTTP_PORT ?? 8787);
 const TOKEN = process.env.JOB_MCP_HTTP_TOKEN; // optional shared secret
@@ -80,7 +92,7 @@ function authorized(req: IncomingMessage): boolean {
   return safeEqual(header, `Bearer ${TOKEN}`);
 }
 
-async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
+export async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (req.method === "OPTIONS") {
     // Only preflight for allowed origins; others get a bare 204 (no ACAO).
     send(res, 204, { ok: true }, req);
@@ -92,6 +104,85 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       ok: true,
       data: { tools: tools.map((t) => t.name) },
     }, req);
+    return;
+  }
+
+  // ── One-click setup endpoints (v0.4.0) ───────────────────────
+  // All three are bearer-gated like /call when JOB_MCP_HTTP_TOKEN is set, so a
+  // shared-secret bridge does not leak the system report or accept settings
+  // writes from an unauthenticated origin.
+
+  if (req.url === "/detect" && req.method === "GET") {
+    if (!authorized(req)) {
+      send(res, 401, { ok: false, error: "unauthorized" }, req);
+      return;
+    }
+    try {
+      const report = await buildSystemReport({ bridgeStatus: "running", port: PORT });
+      send(res, 200, { ok: true, data: report }, req);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      send(res, 500, { ok: false, error: message }, req);
+    }
+    return;
+  }
+
+  if (req.url === "/settings" && req.method === "GET") {
+    if (!authorized(req)) {
+      send(res, 401, { ok: false, error: "unauthorized" }, req);
+      return;
+    }
+    const s = readAllSettings();
+    send(res, 200, {
+      ok: true,
+      data: {
+        ai_provider: s.ai_provider,
+        ai_model: s.ai_model,
+        ai_base_url: s.ai_base_url,
+        // The raw key is NEVER returned — only the masked form + a presence flag.
+        ai_api_key: maskApiKey(s.ai_api_key),
+        ai_api_key_present: isKeySet(s.ai_api_key),
+      },
+    }, req);
+    return;
+  }
+
+  if (req.url === "/settings" && req.method === "POST") {
+    if (!authorized(req)) {
+      send(res, 401, { ok: false, error: "unauthorized" }, req);
+      return;
+    }
+    let parsed: Partial<SettingsPatch>;
+    try {
+      parsed = JSON.parse(await readBody(req)) as Partial<SettingsPatch>;
+    } catch {
+      send(res, 400, { ok: false, error: "invalid JSON body" }, req);
+      return;
+    }
+    const v = validateSettings(parsed);
+    if (!v.ok) {
+      send(res, 400, { ok: false, error: v.error }, req);
+      return;
+    }
+    try {
+      writeSettings(v.value);
+      // Mutate this process's env so the next /call picks up the new settings
+      // with no restart (getProvider reads process.env at call time).
+      applyPersistedSettingsToEnv();
+      const after = readAllSettings();
+      send(res, 200, {
+        ok: true,
+        summary: "settings applied",
+        data: {
+          applied: Object.keys(v.value),
+          ai_api_key: maskApiKey(after.ai_api_key),
+          ai_api_key_present: isKeySet(after.ai_api_key),
+        },
+      }, req);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      send(res, 500, { ok: false, error: message }, req);
+    }
     return;
   }
 
@@ -144,6 +235,10 @@ async function main(): Promise<void> {
   // Initialise the DB and (defensively) the MCP server factory so any startup
   // errors surface immediately.
   openDb();
+  // Apply any persisted one-click settings (v0.4.0) to process.env so the
+  // bridge starts with the user's chosen AI provider, not just ambient env.
+  // Empty store = no-op (env-only users unaffected).
+  applyPersistedSettingsToEnv();
   createMcpServer();
 
   const server = createServer((req, res) => {
@@ -159,6 +254,9 @@ async function main(): Promise<void> {
     process.stdout.write(
       `job-application-mcp HTTP bridge listening on ${host}\n` +
         `  GET  /health        — list available tools\n` +
+        `  GET  /detect        — system report (bridge + AI + data state)\n` +
+        `  GET  /settings      — current AI settings (key masked)\n` +
+        `  POST /settings      — apply AI settings (applies live, no restart)\n` +
         `  POST /call          — invoke a tool: { "name", "arguments" }\n` +
         (TOKEN ? "  auth: Bearer token required (JOB_MCP_HTTP_TOKEN)\n" : "  auth: none (set JOB_MCP_HTTP_TOKEN to require a bearer token)\n")
     );

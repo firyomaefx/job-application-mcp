@@ -177,12 +177,44 @@ function migrate(db: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_aiusage_created ON ai_usage(created_at);
   `);
 
+  // ── schema v5: job inbox + reminders (Phase 3) ─────────────────────────
+  // Additive. jobs gains inbox_status (new/triaged/applied/archived) for the
+  // pipeline view; rank is computed at read time from match_score + recency so
+  // it is not stored. A new reminders table backs follow-up nudges.
+  addColumnIfMissing(db, "jobs", "inbox_status", "TEXT NOT NULL DEFAULT 'new'");
+  db.exec("UPDATE jobs SET inbox_status = 'new' WHERE inbox_status IS NULL");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_jobs_inbox ON jobs(profile_id, inbox_status)");
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS reminders (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      profile_id     INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+      application_id INTEGER REFERENCES applications(id) ON DELETE CASCADE,
+      job_id         INTEGER REFERENCES jobs(id) ON DELETE CASCADE,
+      kind           TEXT NOT NULL,        -- 'follow_up' | 'interview' | 'custom'
+      title          TEXT NOT NULL,
+      due_at         TEXT NOT NULL,         -- ISO date
+      done           INTEGER NOT NULL DEFAULT 0,
+      created_at     TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_reminders_profile ON reminders(profile_id, done, due_at);
+  `);
+
   const row = db.prepare("SELECT value FROM meta WHERE key = ?").get("schema_version") as
     | { value: string }
     | undefined;
   const current = row ? Number(row.value) : 0;
-  if (current < 3) {
-    db.prepare("INSERT OR REPLACE INTO meta(key, value) VALUES (?, '3')").run("schema_version");
+  if (current < 5) {
+    db.prepare("INSERT OR REPLACE INTO meta(key, value) VALUES (?, '5')").run("schema_version");
+  }
+}
+
+/** Add a column to a table only if it does not already exist (SQLite has no
+ *  ADD COLUMN IF NOT EXISTS). Used for additive, backward-compatible migrations. */
+function addColumnIfMissing(db: DatabaseSync, table: string, column: string, type: string): void {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (!cols.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
   }
 }
 

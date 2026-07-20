@@ -43,11 +43,19 @@ export interface AiProvider {
  * Pick a provider based on env + entitlement. Order: configured real provider
  * (if key present AND ai mode) → mock. The caller (tool) decides whether to
  * debit a credit.
+ *
+ * `ollama` is a local, OpenAI-compatible model server that needs **no API key**;
+ * it is selected purely on `AI_PROVIDER=ollama` (keyless), so free users can run
+ * fully offline with a local model. The caller still gates it through `useReal`,
+ * which `resolveProvider` sets true for ollama even without a key.
  */
 export async function getProvider(opts: { useReal: boolean }): Promise<AiProvider> {
   if (opts.useReal) {
     const provider = process.env.AI_PROVIDER?.toLowerCase();
     const key = process.env.AI_API_KEY;
+    if (provider === "ollama") {
+      return new (await import("./ollama.js")).OllamaProvider();
+    }
     if (provider === "anthropic" && key) {
       return new (await import("./anthropic.js")).AnthropicProvider(key, process.env.AI_MODEL);
     }
