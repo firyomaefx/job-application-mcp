@@ -37,11 +37,11 @@ Evidence date: 2026-08-13. Branch under evaluation: `codex/job-copilot-foundatio
 - Phase 0 evidence baseline: **PASS**.
 - Phase 1 local foundation: **PASS** — clean installs, type-check, build, 138 tests, MCP smoke, bridge bundle, zero audit findings, and Windows runtime packaging pass.
 - Windows unsigned-alpha installer: **PASS** for local delivery; signing remains an accepted prerelease limitation.
-- Authoritative remote CI/release: **BLOCKED** — the configured GitHub CLI token is invalid, so the approved push, draft PR, merge, tag, and prerelease cannot yet run. PR #1 remains remote and conflicting until authentication is restored.
+- Authoritative remote CI/release: **PASS for v0.4.2 unsigned alpha** — PR #2 passed the complete CI matrix, merged as `aee2c00`, and tag `v0.4.2` produced a successful prerelease workflow. PR #1 was closed as superseded.
 - Paid pilots: **NO-GO** until the provenance vertical slice and manual entitlement boundary exist.
 - Public production release: **NO-GO** due to missing real security contact, signing/SBOM, complete privacy controls, graph provenance, and hosted isolation.
 
-The owner authorized a draft PR and unsigned v0.4.2 prerelease, but GitHub authentication must be restored before those external actions can execute.
+The v0.4.2 prerelease is available at https://github.com/firyomaefx/job-application-mcp/releases/tag/v0.4.2. This does not change the paid-pilot or public-production NO-GO decisions.
 
 ## Phase 1 evidence
 
@@ -56,3 +56,7 @@ The owner authorized a draft PR and unsigned v0.4.2 prerelease, but GitHub authe
 - Final local Setup SHA-256: `B0492DA29767B32E7DCF00EA09D0B03834C672E107EDCC5B379E1F7ED8920B18`; size 101,418,107 bytes.
 - Two builds used the same source and artifact name but differed by 3 bytes/hash due to embedded build metadata; byte-for-byte reproducibility is not achieved.
 - Authenticode status: `NotSigned` (accepted only for the clearly labelled alpha prerelease).
+- PR #2 CI: Node 22/24 on Windows and Linux plus MCP smoke all passed.
+- Release workflow `31647314794`: core/extension, Windows, Linux, macOS, checksum generation, and publish jobs passed.
+- Downloaded GitHub Windows asset: 101,418,980 bytes; SHA-256 `ECA204CF7DB592D8C6870CB92C36FD794A293E84DDA54AC65DA3FE019484E206`; matches the published `SHA256SUMS.txt`.
+- The downloaded GitHub installer passed clean install, restricted-PATH startup, 41-tool bridge health, and clean uninstall; Authenticode remains `NotSigned`.
