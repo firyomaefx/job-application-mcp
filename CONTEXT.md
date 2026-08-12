@@ -7,8 +7,8 @@
 
 ## Current State
 - Current version: v0.4.2 unsigned alpha, merged to `main` and published as a GitHub prerelease.
-- Working features: stdio MCP, local bridge, CV/job/application stores, heuristic/optional AI drafting, approval recording, reminders, backup/restore, Windows packaging.
-- Recent verified changes: schema v6 migration; clean lockfiles/CI; session-only provider keys; Electron utility-process bridge; complete packaged-module manifest; clean Windows install/start/restart/uninstall; current product/security/privacy documents.
+- Working features: stdio MCP, local bridge, CV/job/application stores, heuristic/optional AI drafting, approval recording, reminders, backup/restore, Windows packaging, and a deterministic daily effectiveness regression gate.
+- Recent verified changes: schema v6 migration; clean lockfiles/CI; session-only provider keys; Electron utility-process bridge; complete packaged-module manifest; clean Windows install/start/restart/uninstall; current product/security/privacy documents; daily synthetic fit/gap/prompt-boundary evaluation with artifact and regression-issue lifecycle.
 - Known issues: no provenance graph/golden path; cloud sync no-op; hosted tenancy/payments not production; HTTP auth optional; parsers lack full hostile-file budgets; installer unsigned and not byte-reproducible; no real security contact.
 - Pending work: Phase 2 provenance vertical slice; signing/SBOM; security contact; hostile-file budgets; production controls.
 
@@ -48,3 +48,11 @@
 - Validation: CI passed Node 22/24 on Windows/Linux and MCP smoke; release workflow `31647314794` passed all jobs; downloaded Windows asset SHA-256 `ECA204CF7DB592D8C6870CB92C36FD794A293E84DDA54AC65DA3FE019484E206` matched `SHA256SUMS.txt` and passed install/start/41-tool health/uninstall.
 - Result: v0.4.2 unsigned-alpha GitHub release gate PASS. Paid pilots and public production remain NO-GO.
 - Remaining work: Sign future installers, add SBOM and security contact, and implement provenance-locked Phase 2 before paid or public production use.
+
+### 2026-08-13 — Daily effectiveness gate
+- Request: Push a safe daily cron job that improves product effectiveness without autonomous code or user-data changes.
+- Changes: Added synthetic Malaysia-oriented fit/gap and hostile-prompt fixtures, reviewed thresholds, daily GitHub workflow, artifacts/job summary, single regression-issue lifecycle, and current Node 24 GitHub Action majors.
+- Files affected: `.github/workflows/*`, `evals/*`, `tests/effectiveness.test.ts`, `docs/EFFECTIVENESS.md`, `README.md`, `package.json`, `.gitignore`, `CONTEXT.md`.
+- Validation: Local type-check/build; 140/140 tests; four effectiveness metrics passed; zero root/desktop audit findings; PR #4 and #5 CI passed Node 22/24 on Windows/Linux plus MCP smoke; daily run `31648697117` passed with one artifact, zero annotations, and no open regression issue.
+- Result: Daily gate PASS at `17 1 * * *` (09:17 Malaysia time); it reports regressions but never rewrites code, reads user data, or calls an external model.
+- Remaining work: Add evidence-locked claim provenance and validated outcome metrics before claiming application-quality or interview-effectiveness improvement.
