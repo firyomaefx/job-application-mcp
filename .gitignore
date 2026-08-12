@@ -7,6 +7,7 @@ dist/
 desktop/release/
 # Generated bundled bridge (built by `npm run bundle:bridge` / CI before packaging)
 desktop/bridge-bundle.mjs
+artifacts/effectiveness/
 
 # Local data (never commit user data)
 data/
