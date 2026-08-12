@@ -6,6 +6,16 @@ breaking changes may bump the minor version.
 
 ## [Unreleased]
 
+### Packaging CAPA
+- Added a post-package `app.asar` verifier that recursively checks all static
+  local Electron main/preload dependencies, renderer assets, and the bundled
+  bridge instead of trusting the electron-builder allow-list alone.
+- Linux, Windows, and macOS pull-request packaging plus every release-platform
+  build now fail before upload if a packaged runtime file is missing or stale.
+- Reproduced the v0.4.1 `version-util.js` omission, rebuilt v0.4.2 locally, and
+  verified archive contents, packaged launch, 41-tool bridge health, isolated
+  NSIS install, and clean uninstall. The installer remains unsigned alpha.
+
 ## [0.4.2] — 2026-08-13
 
 ### Foundation recovery and unsigned Windows alpha

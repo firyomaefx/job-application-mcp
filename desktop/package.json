@@ -9,13 +9,18 @@
   "scripts": {
     "start": "electron .",
     "icon": "node build-icon.js",
-    "pack": "electron-builder --dir",
-    "dist": "electron-builder"
+    "pack": "electron-builder --dir && npm run verify:package",
+    "dist": "electron-builder && npm run verify:package",
+    "test:package-verifier": "node --test verify-package.test.cjs",
+    "verify:package": "npm run test:package-verifier && node verify-package.cjs"
   },
   "dependencies": {
     "electron-updater": "6.8.9"
   },
   "devDependencies": {
+    "@electron/asar": "3.4.1",
+    "acorn": "8.18.0",
+    "acorn-walk": "8.3.5",
     "electron": "43.4.0",
     "electron-builder": "26.15.3"
   },
