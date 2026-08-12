@@ -1,0 +1,160 @@
+name: Daily effectiveness
+
+on:
+  schedule:
+    # 01:17 UTC = 09:17 Malaysia time. The non-hour boundary reduces scheduler congestion.
+    - cron: '17 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: daily-effectiveness
+  cancel-in-progress: true
+
+jobs:
+  evaluate:
+    name: Deterministic safety and effectiveness gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        id: install
+        continue-on-error: true
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        id: typecheck
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run typecheck
+
+      - name: Build
+        id: build
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run build
+
+      - name: Full test suite
+        id: tests
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm test
+
+      - name: Effectiveness benchmark
+        id: effectiveness
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run eval:effectiveness
+
+      - name: Publish job summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f artifacts/effectiveness/report.md ]; then
+            cat artifacts/effectiveness/report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            printf '# Daily Effectiveness Report\n\nThe report could not be generated. Check the failed setup or validation step.\n' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload effectiveness evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-effectiveness-${{ github.run_id }}
+          path: artifacts/effectiveness/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Open, update, or close the regression issue
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          INSTALL_OUTCOME: ${{ steps.install.outcome }}
+          TYPECHECK_OUTCOME: ${{ steps.typecheck.outcome }}
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          TESTS_OUTCOME: ${{ steps.tests.outcome }}
+          EFFECTIVENESS_OUTCOME: ${{ steps.effectiveness.outcome }}
+        with:
+          script: |
+            const fs = require('fs');
+            const title = '[daily effectiveness] regression detected';
+            const outcomes = {
+              install: process.env.INSTALL_OUTCOME,
+              typecheck: process.env.TYPECHECK_OUTCOME,
+              build: process.env.BUILD_OUTCOME,
+              tests: process.env.TESTS_OUTCOME,
+              effectiveness: process.env.EFFECTIVENESS_OUTCOME,
+            };
+            const failures = Object.entries(outcomes)
+              .filter(([, outcome]) => outcome !== 'success')
+              .map(([name, outcome]) => `${name}: ${outcome || 'not run'}`);
+            const report = fs.existsSync('artifacts/effectiveness/report.md')
+              ? fs.readFileSync('artifacts/effectiveness/report.md', 'utf8')
+              : 'No effectiveness report was generated.';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = `${report}\n\n## Workflow evidence\n\n- Run: ${runUrl}\n- Failed checks: ${failures.length ? failures.join(', ') : 'none'}\n\nThis issue is managed by the daily workflow. It reports regressions but never changes production code or user data.`;
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            });
+            const existing = issues.find((issue) => issue.title === title && !issue.pull_request);
+            if (failures.length) {
+              if (existing) {
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: existing.number,
+                  body,
+                });
+              } else {
+                await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title,
+                  body,
+                });
+              }
+            } else if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body: `Recovered in ${runUrl}. All daily checks passed.`,
+              });
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                state: 'closed',
+              });
+            }
+
+      - name: Enforce daily gate
+        if: always()
+        shell: bash
+        run: |
+          outcomes=(
+            "${{ steps.install.outcome }}"
+            "${{ steps.typecheck.outcome }}"
+            "${{ steps.build.outcome }}"
+            "${{ steps.tests.outcome }}"
+            "${{ steps.effectiveness.outcome }}"
+          )
+          for outcome in "${outcomes[@]}"; do
+            if [ "$outcome" != "success" ]; then
+              exit 1
+            fi
+          done

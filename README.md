@@ -349,6 +349,8 @@ job-application-mcp/
 ├── extension/             # Chrome MV3 extension (form capture → preview)
 ├── desktop/               # Electron wrapper UI (launches the bridge)
 ├── .github/workflows/ci.yml  # build + typecheck + test + stdio smoke
+├── .github/workflows/daily-effectiveness.yml # scheduled regression gate
+├── evals/                 # synthetic effectiveness fixtures + thresholds
 ├── tests/                 # node:test suite
 ├── BUSINESS_PROPOSAL.md   # open-core + paid-service model
 ├── CLAUDE.md              # guide for Claude Code working in this repo
@@ -394,8 +396,14 @@ profile, applications). Run with `cd desktop && npm install && npm start`. See
 npm run build       # tsc -> dist/
 npm run typecheck   # tsc --noEmit
 npm test            # node --test (scoring + store)
+npm run eval:effectiveness # synthetic safety/effectiveness report
 npm run dev         # tsc --watch
 ```
+
+GitHub also runs the deterministic effectiveness gate daily at 01:17 UTC
+(09:17 Malaysia time). It uses synthetic fixtures, makes no model calls, and
+never changes code or user data automatically. See
+[`docs/EFFECTIVENESS.md`](./docs/EFFECTIVENESS.md) for metrics and limits.
 
 ### Adding a tool
 

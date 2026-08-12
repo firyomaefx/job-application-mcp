@@ -18,6 +18,7 @@
     "serve": "node dist/src/index.js",
     "serve:http": "node dist/src/http.js",
     "test": "node --test --import tsx tests/*.test.ts",
+    "eval:effectiveness": "tsx evals/run-effectiveness.ts",
     "typecheck": "tsc --noEmit",
     "bundle:bridge": "esbuild dist/src/http.js --bundle --platform=node --format=esm --target=node22 --outfile=desktop/bridge-bundle.mjs",
     "prepublishOnly": "npm run build"
