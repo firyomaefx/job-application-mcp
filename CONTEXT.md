@@ -6,11 +6,11 @@
 - Primary entry points: `src/index.ts`, `src/http.ts`, `cli/cli.ts`, `desktop/main.js`.
 
 ## Current State
-- Current version: 0.4.2 unsigned-alpha candidate on local branch `codex/job-copilot-foundation`, reconciled with `origin/main`.
+- Current version: v0.4.2 unsigned alpha, merged to `main` and published as a GitHub prerelease.
 - Working features: stdio MCP, local bridge, CV/job/application stores, heuristic/optional AI drafting, approval recording, reminders, backup/restore, Windows packaging.
 - Recent verified changes: schema v6 migration; clean lockfiles/CI; session-only provider keys; Electron utility-process bridge; complete packaged-module manifest; clean Windows install/start/restart/uninstall; current product/security/privacy documents.
-- Known issues: no provenance graph/golden path; cloud sync no-op; hosted tenancy/payments not production; HTTP auth optional; parsers lack full hostile-file budgets; installer unsigned and not byte-reproducible; no real security contact; GitHub authentication invalid.
-- Pending work: restore GitHub authentication; push draft PR and run remote CI; publish the approved v0.4.2 prerelease only after green CI; then implement Phase 2 provenance.
+- Known issues: no provenance graph/golden path; cloud sync no-op; hosted tenancy/payments not production; HTTP auth optional; parsers lack full hostile-file budgets; installer unsigned and not byte-reproducible; no real security contact.
+- Pending work: Phase 2 provenance vertical slice; signing/SBOM; security contact; hostile-file budgets; production controls.
 
 ## Architecture
 - Main components: Domain/tool handlers, stdio MCP and loopback HTTP transports, SQLite store, AI adapters, Electron and Chrome companions.
@@ -39,4 +39,12 @@
 - Files affected: Release workflow/version docs, desktop manifest/runtime, CV merge resolution, and tests.
 - Validation: Clean root/desktop installs; zero audit findings; type-check/build; 138/138 tests; MCP smoke; two NSIS builds; clean install/start/restart/restricted-PATH/uninstall; final Setup SHA-256 `B0492DA29767B32E7DCF00EA09D0B03834C672E107EDCC5B379E1F7ED8920B18`; Authenticode `NotSigned`.
 - Result: Local Windows unsigned-alpha installer gate PASS. Paid pilots and public production remain NO-GO.
-- Remaining work: GitHub push/PR/CI/tag/prerelease is blocked by an invalid `gh` token; installer signing, SBOM, provenance graph, and production controls remain open.
+- Remaining work: Installer signing, SBOM, provenance graph, security contact, and production controls remain open.
+
+### 2026-08-13 — v0.4.2 GitHub prerelease
+- Request: Deliver the verified Windows installer through a green PR and unsigned GitHub prerelease.
+- Changes: PR #2 merged as `aee2c00`; tag `v0.4.2` published a checksummed prerelease; conflicting PR #1 was closed as superseded.
+- Files affected: No production behavior in this Reflect step; release evidence only.
+- Validation: CI passed Node 22/24 on Windows/Linux and MCP smoke; release workflow `31647314794` passed all jobs; downloaded Windows asset SHA-256 `ECA204CF7DB592D8C6870CB92C36FD794A293E84DDA54AC65DA3FE019484E206` matched `SHA256SUMS.txt` and passed install/start/41-tool health/uninstall.
+- Result: v0.4.2 unsigned-alpha GitHub release gate PASS. Paid pilots and public production remain NO-GO.
+- Remaining work: Sign future installers, add SBOM and security contact, and implement provenance-locked Phase 2 before paid or public production use.
