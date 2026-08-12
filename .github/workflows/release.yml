@@ -14,9 +14,9 @@ jobs:
     name: Core + extension zip
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: npm
@@ -41,7 +41,7 @@ jobs:
             package.json package-lock.json README.md BUSINESS_PROPOSAL.md \
             CLAUDE.md CHANGELOG.md LICENSE
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: core-and-extension
           path: artifacts/*.zip
@@ -64,9 +64,9 @@ jobs:
             platform: mac
             target: dmg
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: npm
@@ -87,7 +87,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: cd desktop && npx electron-builder --${{ matrix.platform }} ${{ matrix.target }} --publish never
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: desktop-${{ matrix.target }}
           path: |
@@ -103,9 +103,9 @@ jobs:
     needs: [build-core-and-extension, desktop]
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
 

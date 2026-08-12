@@ -21,9 +21,9 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: npm
@@ -69,7 +69,7 @@ jobs:
 
       - name: Upload effectiveness evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: daily-effectiveness-${{ github.run_id }}
           path: artifacts/effectiveness/
@@ -78,7 +78,7 @@ jobs:
 
       - name: Open, update, or close the regression issue
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           INSTALL_OUTCOME: ${{ steps.install.outcome }}
           TYPECHECK_OUTCOME: ${{ steps.typecheck.outcome }}
