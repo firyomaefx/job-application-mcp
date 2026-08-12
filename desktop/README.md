@@ -4,9 +4,9 @@ A thin desktop wrapper that launches the project's local HTTP bridge and shows a
 small dashboard: server status, your candidate profile, and your applications.
 
 The app is **standalone**: the HTTP bridge is esbuild-bundled into a single
-self-contained ESM file (`bridge-bundle.mjs`) and forked from Electron's own
-bundled Node runtime (`ELECTRON_RUN_AS_NODE=1`), so **no system Node.js is
-required** on the user's machine. It only **reads** local data — submission
+self-contained ESM file (`bridge-bundle.mjs`) and launched with Electron's
+supported `utilityProcess` API, so **no system Node.js is required** on the
+user's machine. It only **reads** local data — submission
 stays manual, as in the rest of the project.
 
 ## Prerequisites (development only)
@@ -60,6 +60,12 @@ cd desktop
 npm run dist   # electron-builder -> release/ (NSIS on Windows, dmg on mac, AppImage on linux)
 ```
 
+Both `npm run pack` and `npm run dist` run `npm run verify:package` after
+electron-builder. The verifier inspects the generated `app.asar`, recursively
+checks local main/preload dependencies, byte-compares runtime files with source,
+confirms renderer assets, and requires the bundled bridge. A missing or stale
+packaged module fails the build before upload.
+
 `electron-builder` config is in `desktop/package.json`. The bundle is shipped as
 an `extraResource` (extracted to `resources/bridge-bundle.mjs`); `main.js`
 resolves it there when packaged. No system Node.js is required at runtime.
@@ -69,7 +75,7 @@ resolves it there when packaged. No system Node.js is required at runtime.
 ```text
 desktop/
 ├── package.json          # Electron + electron-builder (extraResources: bridge-bundle.mjs)
-├── main.js               # main process: forks bundled bridge via ELECTRON_RUN_AS_NODE, IPC, window
+├── main.js               # main process: forks bundled bridge via utilityProcess, IPC, window
 ├── preload.js            # safe contextBridge API
 ├── bridge-bundle.mjs     # esbuild-bundled HTTP bridge (generated; self-contained, no system Node)
 └── renderer/

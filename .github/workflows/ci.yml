@@ -40,11 +40,39 @@ jobs:
       - name: Test
         run: npm test
 
+
+  package-desktop:
+    name: Package verification (${{ matrix.os }})
+    needs: build-and-test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - run: npm run bundle:bridge
+      - run: npm ci --prefix desktop --no-audit --no-fund
+      - run: npm run pack --prefix desktop
+
+      - name: Smoke packaged Windows runtime and bridge
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: ./desktop/smoke-packaged.ps1
+
   # Lightweight smoke test of the stdio MCP server: boot it and call tools/list.
   smoke:
     name: MCP server smoke test
     runs-on: ubuntu-latest
-    needs: build-and-test
+    needs: [build-and-test, package-desktop]
     steps:
       - uses: actions/checkout@v7
 

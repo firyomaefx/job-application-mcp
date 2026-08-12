@@ -87,6 +87,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: cd desktop && npx electron-builder --${{ matrix.platform }} ${{ matrix.target }} --publish never
 
+      - name: Verify packaged runtime contents
+        run: cd desktop && npm run verify:package
+
+      - name: Smoke packaged Windows runtime and bridge
+        if: matrix.platform == 'win'
+        shell: pwsh
+        run: ./desktop/smoke-packaged.ps1
+
       - uses: actions/upload-artifact@v7
         with:
           name: desktop-${{ matrix.target }}
