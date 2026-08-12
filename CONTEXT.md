@@ -56,3 +56,11 @@
 - Validation: Local type-check/build; 140/140 tests; four effectiveness metrics passed; zero root/desktop audit findings; PR #4 and #5 CI passed Node 22/24 on Windows/Linux plus MCP smoke; daily run `31648697117` passed with one artifact, zero annotations, and no open regression issue.
 - Result: Daily gate PASS at `17 1 * * *` (09:17 Malaysia time); it reports regressions but never rewrites code, reads user data, or calls an external model.
 - Remaining work: Add evidence-locked claim provenance and validated outcome metrics before claiming application-quality or interview-effectiveness improvement.
+
+### 2026-08-13 — Packaged dependency CAPA
+- Request: Find, reproduce, and permanently prevent the Windows Electron `Cannot find module './version-util.js'` startup failure.
+- Changes: Quarantined the known-broken local v0.4.1 artifacts; added AST-based recursive local-module discovery, fail-closed dynamic-specifier handling, ASAR source-byte verification, bridge-byte verification, a real missing/stale-ASAR regression suite, packaged Windows runtime smoke, and Linux/Windows/macOS packaging gates for pull requests and releases.
+- Files affected: Desktop verifier/tests/scripts and package lock, CI/release workflows, desktop/CHANGELOG documentation, and `docs/CAPA_PACKAGED_MODULE_2026-08-13.md`.
+- Validation: Type-check/build; 140/140 root tests; 6/6 verifier tests; zero root/desktop audit findings; Windows pack/dist archive verification; packaged and installed 41-tool bridge health; clean uninstall; `git diff --check`. Local Setup SHA-256 `C5048D1D8D9C6748C4CFB10D8E7A346CA869C224F9E4E403AF7E9936E9050BF8`; Authenticode `NotSigned`.
+- Result: Immediate Windows failure class fixed and locally verified at commit `fa9a019`. GitHub delivery is blocked: local TCP 443 cannot reach GitHub, the connector has read-only repository access, and GitHub CLI authentication is invalid; hosted three-platform CI has not run.
+- Remaining work: Push `codex/capa-packaged-dependencies`, require the three-platform packaging matrix and full CI to pass, then merge. A future CAPA-bearing release must use a new immutable version such as v0.4.3; do not retag v0.4.2.
