@@ -14,6 +14,10 @@ breaking changes may bump the minor version.
 - Updated the MCP SDK and Electron packaging dependencies, kept
   `electron-updater` in the packaged runtime, and retained the standalone
   loopback bridge so the desktop app does not require system Node.js.
+- Fixed the packaged desktop startup by including `version-util.js` and using
+  Electron's supported `utilityProcess` API for the bundled bridge. The clean
+  Windows install, restart, restricted-PATH launch, and uninstall paths are
+  runtime-verified.
 - Changed desktop-entered provider keys to process-session-only storage and
   purged legacy plaintext key rows while preserving environment-based keys.
 - Added factual product, architecture, context-graph, security, privacy,

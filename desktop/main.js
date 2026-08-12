@@ -2,16 +2,15 @@
 //
 // Standalone build: the HTTP bridge is esbuild-bundled into a single
 // self-contained ESM file (bridge-bundle.mjs — no TS imports, no system Node
-// required). It is forked from Electron's OWN bundled Node runtime by setting
-// ELECTRON_RUN_AS_NODE=1 and using process.execPath as the binary, so the app
-// does not depend on a Node.js install on the user's PATH.
+// required). Electron's utilityProcess API runs the bridge in a supported Node
+// child process, so the app does not depend on a Node.js install on the user's
+// PATH or on the security-sensitive ELECTRON_RUN_AS_NODE fuse.
 //
 // Dev: the bundle lives next to main.js (build it with `npm run bundle:bridge`
 // from the repo root, after `npm run build`). Packaged: electron-builder
 // ships it as an extraResource under process.resourcesPath.
 
-const { app, BrowserWindow, ipcMain, shell, nativeTheme, Tray, Menu, nativeImage } = require("electron");
-const { spawn } = require("node:child_process");
+const { app, BrowserWindow, ipcMain, shell, nativeTheme, Tray, Menu, nativeImage, utilityProcess } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
 const http = require("node:http");
@@ -74,27 +73,28 @@ function startBridge() {
   bridgeStatus = "starting";
   sendStatus("Starting bridge…");
 
-  // Fork the bundled bridge from Electron's own Node runtime (no system Node
-  // needed). ELECTRON_RUN_AS_NODE makes process.execPath behave as plain `node`.
-  bridgeProc = spawn(process.execPath, [BRIDGE_SCRIPT], {
+  // Run the bundled bridge through Electron's supported Node utility process.
+  // Packaged executables may disable the runAsNode fuse, so spawning
+  // process.execPath with ELECTRON_RUN_AS_NODE is not a reliable release path.
+  bridgeProc = utilityProcess.fork(BRIDGE_SCRIPT, [], {
     env: {
       ...process.env,
-      ELECTRON_RUN_AS_NODE: "1",
       JOB_MCP_DATA_DIR: DATA_DIR,
       JOB_MCP_HTTP_PORT: String(BRIDGE_PORT),
       JOB_MCP_HTTP_TOKEN: BRIDGE_TOKEN,
     },
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: "pipe",
+    serviceName: "Job Application MCP Bridge",
   });
 
-  bridgeProc.stdout.on("data", (d) => {
+  bridgeProc.stdout?.on("data", (d) => {
     const s = d.toString();
     if (s.includes("listening")) {
       bridgeStatus = "running";
       sendStatus("Bridge running");
     }
   });
-  bridgeProc.stderr.on("data", (d) => {
+  bridgeProc.stderr?.on("data", (d) => {
     console.error("[bridge]", d.toString().trim());
   });
   bridgeProc.on("exit", (code) => {

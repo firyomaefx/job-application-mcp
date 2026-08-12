@@ -22,7 +22,7 @@
   "build": {
     "appId": "io.github.jobapplicationmcp.desktop",
     "productName": "Job Application MCP",
-    "files": ["main.js", "preload.js", "renderer/**/*"],
+    "files": ["main.js", "preload.js", "version-util.js", "renderer/**/*"],
     "extraResources": [
       { "from": "bridge-bundle.mjs", "to": "bridge-bundle.mjs" }
     ],

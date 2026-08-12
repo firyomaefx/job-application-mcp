@@ -1,6 +1,6 @@
 # Release Gate
 
-Evidence date: 2026-08-12. Branch under evaluation: `codex/job-copilot-foundation`, based on `origin/roadmap/v0.2` / tag v0.4.1.
+Evidence date: 2026-08-13. Branch under evaluation: `codex/job-copilot-foundation`, reconciled locally with `origin/main` and prepared as v0.4.2.
 
 ## Phase 0 baseline
 
@@ -23,7 +23,7 @@ Evidence date: 2026-08-12. Branch under evaluation: `codex/job-copilot-foundatio
 | approval-gated submission recording | Working and verified | records submission; does not submit externally |
 | job tracker/reminders/backups | Working and verified | local only |
 | Chrome import/autofill preview | Present but unverified in a real browser this cycle | user-invoked; never submit |
-| desktop installers | Working with limitations | Windows NSIS + portable built locally; unsigned |
+| desktop installer | Working with limitations | Windows x64 NSIS install/start/restart/uninstall verified; unsigned and not byte-reproducible |
 | cloud sync | Placeholder or no-op | `LocalNoopSync` always returned |
 | hosted auth/tenant isolation | Roadmap only | no hosted store or RLS |
 | payments/licensing | Present but unverified seam | client-bypassable local enforcement; no live checkout |
@@ -35,21 +35,24 @@ Evidence date: 2026-08-12. Branch under evaluation: `codex/job-copilot-foundatio
 ## Gate decision
 
 - Phase 0 evidence baseline: **PASS**.
-- Phase 1 local foundation: **PASS** — clean installs, type-check, build, 136 tests, MCP smoke, bridge bundle, zero production audit findings, and Windows packaging pass.
-- Authoritative remote CI: **BLOCKED/UNVERIFIED** — changes are local only; PR #1 remains conflicting and no push/merge was authorized.
+- Phase 1 local foundation: **PASS** — clean installs, type-check, build, 138 tests, MCP smoke, bridge bundle, zero audit findings, and Windows runtime packaging pass.
+- Windows unsigned-alpha installer: **PASS** for local delivery; signing remains an accepted prerelease limitation.
+- Authoritative remote CI/release: **BLOCKED** — the configured GitHub CLI token is invalid, so the approved push, draft PR, merge, tag, and prerelease cannot yet run. PR #1 remains remote and conflicting until authentication is restored.
 - Paid pilots: **NO-GO** until the provenance vertical slice and manual entitlement boundary exist.
 - Public production release: **NO-GO** due to missing real security contact, signing/SBOM, complete privacy controls, graph provenance, and hosted isolation.
 
-No push, merge, tag, deployment, payment activation, or publication is authorized by this report.
+The owner authorized a draft PR and unsigned v0.4.2 prerelease, but GitHub authentication must be restored before those external actions can execute.
 
 ## Phase 1 evidence
 
 - `npm ci --ignore-scripts --no-audit --no-fund`: pass.
-- `npm run typecheck`; `npm run build`; `npm test`: pass, 136/136.
-- MCP initialize + `tools/list` using protocol `2025-06-18`: pass.
+- `npm run typecheck`; `npm run build`; `npm test`: pass, 138/138.
+- MCP initialize + `tools/list` using protocol `2024-11-05`: pass; server reports v0.4.2 and 41 tools.
 - Root and desktop `npm audit --audit-level=high`: 0 vulnerabilities after MCP SDK 1.30.0, Electron 43.4.0, and electron-builder 26.15.3 upgrades.
 - `npm run bundle:bridge`: pass.
-- `desktop: npm ci`; `electron-builder --win nsis portable --publish never`: pass; packaged `app.asar` contains `electron-updater`.
-- Portable SHA-256: `78429592B447CEB63D9E18E77A13D315DA577E8B37B56AA0072E4563F946C1D2`.
-- Setup SHA-256: `310E2C86719A5A11B399893A36766258A7B089309B085EE42299DEF1A3AE6FD3`.
-- Authenticode status for both artifacts: `NotSigned` (public-release blocker).
+- `desktop: npm ci`; bridge bundle; Windows x64 NSIS package: pass. Packaged `app.asar` contains `electron-updater` and every local main-process module.
+- Clean install exit 0; packaged renderer and Node utility process start; `/health` returns 41 tools; restart returns 41 tools; clean uninstall removes the install directory and registry entry.
+- Launch with `PATH=C:\\Windows\\System32;C:\\Windows` still starts the bridge, proving no system Node.js dependency.
+- Final local Setup SHA-256: `B0492DA29767B32E7DCF00EA09D0B03834C672E107EDCC5B379E1F7ED8920B18`; size 101,418,107 bytes.
+- Two builds used the same source and artifact name but differed by 3 bytes/hash due to embedded build metadata; byte-for-byte reproducibility is not achieved.
+- Authenticode status: `NotSigned` (accepted only for the clearly labelled alpha prerelease).
