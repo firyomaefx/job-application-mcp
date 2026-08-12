@@ -1,10 +1,8 @@
 // Pure settings helpers for the one-click setup feature (v0.4.0).
 //
-// The app stores a tiny set of AI-related settings in the local SQLite `meta`
-// kv table so the desktop UI can change them with a single click instead of
-// editing environment variables. This module is PURE (no I/O, no process.env
-// mutation) so it is unit-testable in isolation. The store layer
-// (`src/store/settings.ts`) does the persistence + env application.
+// The app stores non-secret AI preferences in the local SQLite `meta` table.
+// Provider keys are environment- or session-only and never persisted. This
+// module is PURE; `src/store/settings.ts` owns persistence/env application.
 //
 // Precedence: a persisted (non-empty) value overrides the environment; an empty
 // persisted value falls back to the environment. This keeps env-only users
@@ -38,9 +36,8 @@ export const DEFAULT_SETTINGS: Settings = {
 export const ALLOWED_PROVIDERS = ["", "mock", "ollama", "openai", "anthropic"] as const;
 
 /**
- * A patch the UI sends. The API key is special: a `string` (incl. "") stores
- * the value verbatim, while `null` means "delete the row entirely" (full clear,
- * so the env fallback returns). All other keys accept a `string` only.
+ * A patch the UI sends. An API-key string applies only to the current process;
+ * `null` clears that session key. All other keys are non-secret preferences.
  */
 export type SettingsPatch = {
   ai_provider?: string;
@@ -50,8 +47,7 @@ export type SettingsPatch = {
 };
 
 /**
- * A validated patch. For `ai_api_key`: a `string` (incl. "") is stored verbatim;
- * `null` means "delete the row entirely" (full clear → env fallback returns).
+ * A validated patch. `ai_api_key` is session-only and is never persisted.
  * Other keys are `string` only. A key ABSENT from the patch means "leave
  * unchanged" (the store never writes absent keys).
  */
@@ -71,7 +67,7 @@ export type ValidationResult =
  * provider, rejects unknown providers and non-http(s) base URLs, and rejects
  * newlines in the model id. An empty string is valid for every field (it means
  * "store empty / fall back to env"). `null` is valid ONLY for `ai_api_key` and
- * is preserved as `null` so the store can delete the row.
+ * means clear the current session key.
  */
 export function validateSettings(input: Partial<SettingsPatch>): ValidationResult {
   const out: ValidatedPatch = {};
@@ -100,7 +96,7 @@ export function validateSettings(input: Partial<SettingsPatch>): ValidationResul
 
   if ("ai_api_key" in input) {
     if (input.ai_api_key === null || input.ai_api_key === undefined) {
-      out.ai_api_key = null; // store deletes the row
+      out.ai_api_key = null;
     } else {
       out.ai_api_key = String(input.ai_api_key);
     }

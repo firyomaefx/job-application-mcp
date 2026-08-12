@@ -6,6 +6,22 @@ breaking changes may bump the minor version.
 
 ## [Unreleased]
 
+## [0.4.2] — 2026-08-13
+
+### Foundation recovery and unsigned Windows alpha
+- Repaired clean-checkout installs, Node 22/24 CI, TypeScript builds, MCP smoke
+  coverage, and the schema-v6 CV-version migration without removing legacy data.
+- Updated the MCP SDK and Electron packaging dependencies, kept
+  `electron-updater` in the packaged runtime, and retained the standalone
+  loopback bridge so the desktop app does not require system Node.js.
+- Changed desktop-entered provider keys to process-session-only storage and
+  purged legacy plaintext key rows while preserving environment-based keys.
+- Added factual product, architecture, context-graph, security, privacy,
+  monetisation, competitor, and release-gate documentation.
+- The Windows x64 one-click NSIS installer remains **unsigned alpha software**.
+  Windows SmartScreen may warn; verify the published `SHA256SUMS.txt` before
+  installation. Paid pilots and public production remain NO-GO.
+
 ## [0.4.1] — 2026-07-21
 
 ### Windows portable + one-click installer

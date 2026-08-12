@@ -20,12 +20,14 @@ import {
   validateSettings,
   maskApiKey,
   isKeySet,
+  effectiveSettings,
   type SettingsPatch,
 } from "./lib/settings.js";
 import {
   readAllSettings,
   writeSettings,
   applyPersistedSettingsToEnv,
+  applySessionSecretToEnv,
 } from "./store/settings.js";
 
 const PORT = Number(process.env.JOB_MCP_HTTP_PORT ?? 8787);
@@ -132,7 +134,7 @@ export async function handle(req: IncomingMessage, res: ServerResponse): Promise
       send(res, 401, { ok: false, error: "unauthorized" }, req);
       return;
     }
-    const s = readAllSettings();
+    const s = effectiveSettings(readAllSettings(), process.env);
     send(res, 200, {
       ok: true,
       data: {
@@ -166,10 +168,13 @@ export async function handle(req: IncomingMessage, res: ServerResponse): Promise
     }
     try {
       writeSettings(v.value);
+      if ("ai_api_key" in v.value) {
+        applySessionSecretToEnv(v.value.ai_api_key ?? null);
+      }
       // Mutate this process's env so the next /call picks up the new settings
       // with no restart (getProvider reads process.env at call time).
       applyPersistedSettingsToEnv();
-      const after = readAllSettings();
+      const after = effectiveSettings(readAllSettings(), process.env);
       send(res, 200, {
         ok: true,
         summary: "settings applied",

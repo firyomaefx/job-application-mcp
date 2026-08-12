@@ -15,11 +15,13 @@ function now(): string {
 
 export function saveCv(profileId: number, label: string, text: string, sourcePath: string | null): Cv {
   const db = openDb();
+  const ts = now();
   const info = db
     .prepare(
-      "INSERT INTO cvs (profile_id, label, source_path, text, created_at) VALUES (?, ?, ?, ?, ?)"
+      `INSERT INTO cvs (profile_id, label, source_path, text, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
     )
-    .run(profileId, label, sourcePath, text, now());
+    .run(profileId, label, sourcePath, text, ts, ts);
   const row = db.prepare("SELECT * FROM cvs WHERE id = ?").get(Number(info.lastInsertRowid));
   return row as unknown as Cv;
 }

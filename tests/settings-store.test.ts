@@ -12,6 +12,7 @@ import {
   readAllSettings,
   writeSettings,
   applyPersistedSettingsToEnv,
+  applySessionSecretToEnv,
 } from "../src/store/settings.js";
 import { resetDb, closeDb } from "../src/store/db.js";
 import { SETTINGS_KEYS } from "../src/lib/settings.js";
@@ -46,13 +47,13 @@ test("writeSettings partial patch stores only provided keys + returns full setti
   assert.equal(getSetting("ai_base_url"), "");
 });
 
-test("writeSettings: ai_api_key null deletes the row; string stores verbatim (incl empty)", () => {
+test("writeSettings never persists an API key and removes a legacy plaintext row", () => {
+  setSetting("ai_api_key", "legacy-plaintext");
   writeSettings({ ai_api_key: "sk-test12345" });
-  assert.equal(getSetting("ai_api_key"), "sk-test12345");
+  assert.equal(getSetting("ai_api_key"), "");
+  assert.equal(readAllSettings().ai_api_key, "");
   writeSettings({ ai_api_key: null });
-  assert.equal(getSetting("ai_api_key"), ""); // row deleted
-  writeSettings({ ai_api_key: "" });
-  assert.equal(getSetting("ai_api_key"), ""); // stored empty (not a row, but reads as "")
+  assert.equal(getSetting("ai_api_key"), "");
 });
 
 test("readAllSettings fills missing keys with empty strings", () => {
@@ -93,11 +94,21 @@ test("applyPersistedSettingsToEnv never unsets env", () => {
   assert.equal(process.env.AI_MODEL, "llama3.1");
 });
 
-test("applyPersistedSettingsToEnv applies the API key into env (so getProvider picks it up)", () => {
+test("applySessionSecretToEnv makes a UI key session-only and clears it on request", () => {
   delete process.env.AI_API_KEY;
-  writeSettings({ ai_api_key: "sk-from-ui" });
-  applyPersistedSettingsToEnv();
+  applySessionSecretToEnv("sk-from-ui");
   assert.equal(process.env.AI_API_KEY, "sk-from-ui");
+  assert.equal(getSetting("ai_api_key"), "");
+  applySessionSecretToEnv(null);
+  assert.equal(process.env.AI_API_KEY, undefined);
+});
+
+test("startup application purges a legacy plaintext key without overriding env", () => {
+  setSetting("ai_api_key", "legacy-plaintext");
+  process.env.AI_API_KEY = "sk-from-env";
+  applyPersistedSettingsToEnv();
+  assert.equal(getSetting("ai_api_key"), "");
+  assert.equal(process.env.AI_API_KEY, "sk-from-env");
 });
 
 after(() => {

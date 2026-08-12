@@ -1,6 +1,6 @@
 {
   "name": "job-application-mcp-desktop",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "private": true,
   "description": "Desktop wrapper UI for Job Application MCP. Launches the local HTTP bridge and shows your profile, applications, and server status.",
   "license": "AGPL-3.0-or-later",
@@ -12,10 +12,12 @@
     "pack": "electron-builder --dir",
     "dist": "electron-builder"
   },
+  "dependencies": {
+    "electron-updater": "6.8.9"
+  },
   "devDependencies": {
-    "electron": "^33.0.0",
-    "electron-builder": "^25.0.0",
-    "electron-updater": "^6.3.0"
+    "electron": "43.4.0",
+    "electron-builder": "26.15.3"
   },
   "build": {
     "appId": "io.github.jobapplicationmcp.desktop",

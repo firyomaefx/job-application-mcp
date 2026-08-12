@@ -5,9 +5,9 @@
 // value overrides the process environment; an empty persisted value falls back
 // to the environment. This keeps env-only users (v0.3.0 and earlier) identical.
 //
-// Security: the API key is the user's own, stored on their own machine, behind
-// a loopback-only bridge. It is never logged here (applyPersistedSettingsToEnv
-// returns only key NAMES, not values) and never sent off-machine.
+// Security: non-secret preferences are persisted. Provider API keys are
+// session-only (or supplied through the process environment) and are never
+// written to SQLite. Older plaintext ai_api_key rows are removed on startup.
 
 import { openDb } from "./db.js";
 import {
@@ -45,13 +45,15 @@ export function readAllSettings(): Settings {
     ai_provider: getSetting("ai_provider"),
     ai_model: getSetting("ai_model"),
     ai_base_url: getSetting("ai_base_url"),
-    ai_api_key: getSetting("ai_api_key"),
+    // Deliberately do not expose a legacy plaintext row as a setting.
+    ai_api_key: "",
   };
 }
 
 /**
- * Apply a validated patch. For `ai_api_key`: `null` deletes the row (full
- * clear), a `string` (incl. "") stores it verbatim. Other keys store verbatim.
+ * Apply a validated patch. Non-secret preferences persist. `ai_api_key` is
+ * never persisted; any legacy row is deleted. The HTTP layer applies a key to
+ * the current process separately through `applySessionSecretToEnv`.
  * Absent keys are left untouched. Returns the full settings after write.
  */
 export function writeSettings(patch: ValidatedPatch): Settings {
@@ -59,10 +61,19 @@ export function writeSettings(patch: ValidatedPatch): Settings {
   if ("ai_model" in patch) setSetting("ai_model", patch.ai_model ?? "");
   if ("ai_base_url" in patch) setSetting("ai_base_url", patch.ai_base_url ?? "");
   if ("ai_api_key" in patch) {
-    if (patch.ai_api_key === null) clearSetting("ai_api_key");
-    else setSetting("ai_api_key", patch.ai_api_key ?? "");
+    clearSetting("ai_api_key");
   }
   return readAllSettings();
+}
+
+/** Apply a provider key only to the current process and purge legacy storage. */
+export function applySessionSecretToEnv(
+  value: string | null,
+  env: NodeJS.ProcessEnv = process.env
+): void {
+  clearSetting("ai_api_key");
+  if (isKeySet(value ?? "")) env.AI_API_KEY = value!;
+  else delete env.AI_API_KEY;
 }
 
 /**
@@ -81,16 +92,19 @@ export function applyPersistedSettingsToEnv(
 ): { applied: string[] } {
   const settings = readAllSettings();
   const applied: string[] = [];
-  const map: Record<SettingsKey, string> = {
+  // Purge keys written by v0.4.0/v0.4.1 before applying safe preferences.
+  clearSetting("ai_api_key");
+  const map: Partial<Record<SettingsKey, string>> = {
     ai_provider: "AI_PROVIDER",
     ai_model: "AI_MODEL",
     ai_base_url: "AI_BASE_URL",
-    ai_api_key: "AI_API_KEY",
   };
   for (const key of SETTINGS_KEYS) {
+    const envName = map[key];
+    if (!envName) continue;
     const persisted = settings[key];
     if (isKeySet(persisted)) {
-      env[map[key]] = persisted;
+      env[envName] = persisted;
       applied.push(key);
     }
   }

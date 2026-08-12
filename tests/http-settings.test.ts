@@ -91,13 +91,15 @@ test("GET /detect with bearer → 200 + SystemReport shape", async () => {
   }
 });
 
-test("GET /settings masks the API key and reports presence", async () => {
+test("GET /settings masks the session-only API key and reports presence", async () => {
   // Seed a key directly via a POST (authorized), then GET.
   await req("/settings", "POST", { ai_api_key: "sk-abcdefghij" });
   const r = await req("/settings");
   assert.equal(r.status, 200);
   assert.equal(r.json.data.ai_api_key, "sk-…ghij"); // masked, never raw
   assert.equal(r.json.data.ai_api_key_present, true);
+  const { getSetting } = await import("../src/store/settings.js");
+  assert.equal(getSetting("ai_api_key"), "", "raw key must not be persisted in SQLite");
 });
 
 test("POST /settings applies provider to process.env (no restart) + persists", async () => {
@@ -111,7 +113,7 @@ test("POST /settings applies provider to process.env (no restart) + persists", a
   assert.equal(g.json.data.ai_provider, "ollama");
 });
 
-test("POST /settings with null ai_api_key deletes the row (clear); env fallback returns", async () => {
+test("POST /settings with null ai_api_key clears the session key", async () => {
   clearAiEnv();
   await req("/settings", "POST", { ai_api_key: "sk-fromui12345" });
   let g = await req("/settings");
