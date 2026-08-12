@@ -15,11 +15,13 @@ function now(): string {
 
 export function saveCv(profileId: number, label: string, text: string, sourcePath: string | null): Cv {
   const db = openDb();
+  const ts = now();
   const info = db
     .prepare(
-      "INSERT INTO cvs (profile_id, label, source_path, text, parent_cv_id, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+      `INSERT INTO cvs (profile_id, label, source_path, text, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
     )
-    .run(profileId, label, sourcePath, text, null, 1, now());
+    .run(profileId, label, sourcePath, text, ts, ts);
   const row = db.prepare("SELECT * FROM cvs WHERE id = ?").get(Number(info.lastInsertRowid));
   return row as unknown as Cv;
 }
@@ -30,66 +32,75 @@ export function getCv(id: number): Cv | null {
   return (row as Cv | undefined) ?? null;
 }
 
+/**
+ * Revise a CV as a new version. Insert a new row whose `parent_cv_id` points at
+ * the given CV (so you can branch from any historical version), make it the
+ * sole ACTIVE version of its chain, and return it. The original text of every
+ * prior version is preserved in its own row — nothing is deleted. The chain is
+ * reconstructed by following `parent_cv_id`.
+ *
+ * Only `label` (no `text`) copies the referenced version's text, so a rename
+ * also produces a traceable version.
+ */
 export function updateCv(
   profileId: number,
-  cvId: number,
-  changes: { text?: string; label?: string }
+  id: number,
+  fields: { label?: string; text?: string }
 ): Cv | null {
   const db = openDb();
-  
-  // Get the current CV to use as parent
-  const current = getCv(cvId);
-  if (!current) return null;
-  
-  // Mark the current CV as inactive
-  db.prepare("UPDATE cvs SET is_active = 0 WHERE id = ?").run(cvId);
-  
-  // Create a new version with the current as parent
+  const prev = getCv(id);
+  if (!prev || prev.profile_id !== profileId) return null;
+  const ts = now();
+  const label = fields.label ?? prev.label;
+  const text = fields.text ?? prev.text;
   const info = db
     .prepare(
-      "INSERT INTO cvs (profile_id, label, source_path, text, parent_cv_id, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+      `INSERT INTO cvs (profile_id, label, source_path, text, created_at, parent_cv_id, is_active, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, 1, ?)`
     )
-    .run(
-      profileId,
-      changes.label ?? current.label,
-      current.source_path,
-      changes.text ?? current.text,
-      cvId,
-      1,
-      now()
-    );
-  
-  const row = db.prepare("SELECT * FROM cvs WHERE id = ?").get(Number(info.lastInsertRowid));
-  return (row as Cv | undefined) ?? null;
+    .run(profileId, label, prev.source_path, text, ts, id, ts);
+  // Deactivate every OTHER row in this chain so exactly one version is active.
+  const chain = getCvHistory(profileId, id);
+  const otherIds = chain.map((c) => c.id).filter((cid) => cid !== Number(info.lastInsertRowid));
+  if (otherIds.length) {
+    const placeholders = otherIds.map(() => "?").join(",");
+    db.prepare(`UPDATE cvs SET is_active = 0 WHERE id IN (${placeholders})`).run(...otherIds);
+  }
+  return getCv(Number(info.lastInsertRowid));
 }
 
+/**
+ * Return the full version chain for a CV: walk `parent_cv_id` up to the root,
+ * then return all descendants of that root ordered oldest→newest. Any cv in the
+ * chain resolves to the same set.
+ */
 export function getCvHistory(profileId: number, cvId: number): Cv[] {
   const db = openDb();
-  
-  // Find the root CV by following parent_cv_id upwards
-  let current = getCv(cvId);
-  if (!current) return [];
-  
-  while (current.parent_cv_id) {
-    const parent = getCv(current.parent_cv_id);
-    if (!parent) break;
-    current = parent;
+  // Walk to the root.
+  let rootId = cvId;
+  let cur = getCv(cvId);
+  while (cur && cur.parent_cv_id != null) {
+    rootId = cur.parent_cv_id;
+    cur = getCv(rootId);
   }
-  
-  // Now traverse downwards to build the full chain
-  const chain: Cv[] = [current];
-  let next = db
-    .prepare("SELECT * FROM cvs WHERE parent_cv_id = ? AND profile_id = ? ORDER BY created_at ASC")
-    .get(current.id, profileId) as Cv | undefined;
-  
-  while (next) {
-    chain.push(next);
-    next = db
-      .prepare("SELECT * FROM cvs WHERE parent_cv_id = ? AND profile_id = ? ORDER BY created_at ASC")
-      .get(next.id, profileId) as Cv | undefined;
+  // Collect the root and all descendants linked by parent_cv_id (transitively).
+  const rows: Cv[] = [];
+  const queue = [rootId];
+  const seen = new Set<number>();
+  while (queue.length) {
+    const head = queue.shift()!;
+    if (seen.has(head)) continue;
+    seen.add(head);
+    const row = getCv(head);
+    if (!row || row.profile_id !== profileId) continue;
+    rows.push(row);
+    const children = db
+      .prepare("SELECT id FROM cvs WHERE parent_cv_id = ? AND profile_id = ? ORDER BY id")
+      .all(head, profileId) as { id: number }[];
+    for (const c of children) queue.push(c.id);
   }
-  
-  return chain;
+  rows.sort((a, b) => a.id - b.id);
+  return rows;
 }
 
 // ── Jobs ───────────────────────────────────────────────────────
@@ -133,6 +144,42 @@ export function getJob(id: number): Job | null {
   }
   const { keywords: _k, ...rest } = row;
   return { ...rest, keywords };
+}
+
+// ── Job inbox (Phase 3) ────────────────────────────────────────
+
+export function listInboxJobs(
+  profileId: number,
+  status?: "new" | "triaged" | "applied" | "archived"
+): Job[] {
+  const db = openDb();
+  const rows = status
+    ? db
+        .prepare("SELECT * FROM jobs WHERE profile_id = ? AND inbox_status = ? ORDER BY id DESC")
+        .all(profileId, status)
+    : db.prepare("SELECT * FROM jobs WHERE profile_id = ? ORDER BY id DESC").all(profileId);
+  return (rows as (Omit<Job, "keywords"> & { keywords: string })[]).map((row) => {
+    let keywords: string[] = [];
+    try {
+      keywords = JSON.parse(row.keywords) as string[];
+    } catch {
+      keywords = [];
+    }
+    const { keywords: _k, ...rest } = row;
+    return { ...rest, keywords };
+  });
+}
+
+export function triageJob(
+  profileId: number,
+  jobId: number,
+  status: "new" | "triaged" | "applied" | "archived"
+): Job | null {
+  const db = openDb();
+  const existing = getJob(jobId);
+  if (!existing || existing.profile_id !== profileId) return null;
+  db.prepare("UPDATE jobs SET inbox_status = ? WHERE id = ?").run(status, jobId);
+  return getJob(jobId);
 }
 
 // ── Applications ───────────────────────────────────────────────
@@ -227,6 +274,45 @@ export function updateApplicationStatus(
       "UPDATE applications SET status = ?, notes = COALESCE(?, notes), updated_at = ? WHERE id = ?"
     ).run(status, notes ?? null, ts, id);
   }
+  return getApplication(id);
+}
+
+/**
+ * Partially update an application's editable fields: tailored CV text, cover
+ * letter, screening answers, notes, cv_id, match_score. Status is unchanged
+ * (use updateApplicationStatus for that). Only provided fields are written; the
+ * rest are preserved. Returns the updated row or null if not found.
+ */
+export function updateApplication(
+  id: number,
+  fields: {
+    cv_id?: number | null;
+    match_score?: number | null;
+    tailored_cv_text?: string | null;
+    cover_letter?: string | null;
+    answers?: Record<string, string>;
+    notes?: string | null;
+  }
+): Application | null {
+  const existing = getApplication(id);
+  if (!existing) return null;
+  const db = openDb();
+  const ts = now();
+  db.prepare(
+    `UPDATE applications SET
+       cv_id = ?, match_score = ?, tailored_cv_text = ?, cover_letter = ?,
+       answers = ?, notes = ?, updated_at = ?
+     WHERE id = ?`
+  ).run(
+    fields.cv_id !== undefined ? fields.cv_id : existing.cv_id,
+    fields.match_score !== undefined ? fields.match_score : existing.match_score,
+    fields.tailored_cv_text !== undefined ? fields.tailored_cv_text : existing.tailored_cv_text,
+    fields.cover_letter !== undefined ? fields.cover_letter : existing.cover_letter,
+    JSON.stringify(fields.answers ?? existing.answers),
+    fields.notes !== undefined ? fields.notes : existing.notes,
+    ts,
+    id
+  );
   return getApplication(id);
 }
 

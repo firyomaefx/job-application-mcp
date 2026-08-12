@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Job Application MCP — Quick Start</title>
+<style>
+  @page { size: A4; margin: 16mm 15mm 16mm 15mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", -apple-system, Roboto, Helvetica, Arial, sans-serif; color: #0f172a; font-size: 10.5pt; line-height: 1.5; margin: 0; }
+  h1 { font-size: 20pt; margin: 0 0 2px; color: #4f46e5; }
+  h2 { font-size: 13pt; margin: 18px 0 6px; padding-bottom: 3px; border-bottom: 2px solid #4f46e5; }
+  h3 { font-size: 11pt; margin: 12px 0 4px; color: #1e293b; }
+  p { margin: 6px 0; }
+  .sub { color: #64748b; font-size: 9.5pt; margin: 0 0 6px; }
+  code { font-family: "Cascadia Mono", Consolas, monospace; font-size: 9pt; background: #f1f5f9; border: 1px solid #e2e8f0; padding: 1px 5px; border-radius: 4px; }
+  pre { background: #f8fafc; border: 1px solid #e2e8f0; border-left: 3px solid #4f46e5; border-radius: 6px; padding: 9px 12px; font-size: 9pt; overflow: visible; white-space: pre-wrap; }
+  ol, ul { margin: 6px 0; padding-left: 20px; }
+  li { margin: 4px 0; }
+  .cover { border-bottom: 3px solid #4f46e5; padding-bottom: 8px; margin-bottom: 10px; }
+  .logo { font-size: 22pt; color: #4f46e5; }
+  .bigstep { background:#eef2ff; border:1px solid #c7d2fe; border-left:4px solid #4f46e5; border-radius:8px; padding:10px 14px; margin:10px 0; }
+  .bigstep strong { display:block; font-size:12pt; margin-bottom:2px; }
+  .check { font-family: monospace; font-size:9pt; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:8px 12px; margin:8px 0; }
+  .warn { background:#fffbeb; border:1px solid #fcd34d; border-left:4px solid #b45309; border-radius:8px; padding:8px 12px; font-size:9.5pt; margin:8px 0; }
+  a { color:#4f46e5; text-decoration:none; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="logo">◆</div>
+  <h1>Job Application MCP — Quick Start</h1>
+  <p class="sub">v0.4.0 &nbsp;·&nbsp; one-click setup &nbsp;·&nbsp; local-first &nbsp;·&nbsp; <a href="https://github.com/firyomaefx/job-application-mcp">github.com/firyomaefx/job-application-mcp</a></p>
+</div>
+
+<p>You don't need to configure anything by hand. The app detects what's available and sets itself up with a single click.</p>
+
+<div class="bigstep">
+  <strong>① Install &amp; open</strong>
+  Download the Windows installer (NSIS <code>.exe</code> or <code>.msix</code>) from the GitHub Releases page and run it — or, for the command line, <code>git clone</code> the repo, <code>npm install</code>, <code>npm run build</code>. Open the app; the local bridge starts automatically.
+</div>
+<div class="warn">
+  <strong>First run on Windows:</strong> the installer is currently <em>unsigned</em>, so SmartScreen warns. Choose <em>More info → Run anyway</em>. It's the genuine build — the warning is reputation, not malware.
+</div>
+
+<div class="bigstep">
+  <strong>② Click “Auto-configure &amp; start”</strong>
+  On the <em>Setup &amp; Status</em> card at the top of the dashboard, click the big button. The app:
+  <ol style="margin:4px 0 0">
+    <li>probes for a local <strong>Ollama</strong> model (fully offline, free, no key);</li>
+    <li>if Ollama isn't running, checks whether you've previously set an AI key;</li>
+    <li>otherwise falls back to the built-in <strong>Mock</strong> heuristic (offline, no key);</li>
+    <li>applies the best option and confirms the bridge is up.</li>
+  </ol>
+  A green checklist appears showing the state of <strong>Bridge · AI · Profile · CV</strong>.
+</div>
+
+<div class="check">
+Bridge: ● running :8787
+AI:    ● Ollama (local) · up        [ Mock ] [ ●Ollama ] [ My key ]
+Profile: ● set
+CV:     ○ none — [ Import CV ]
+</div>
+
+<div class="bigstep">
+  <strong>③ Change anything with one click</strong>
+  The same card has one-click <strong>chips</strong> to switch AI provider (Mock / Ollama / My key) — applied live, no restart. The collapsible <em>AI settings</em> form lets you set the <strong>model</strong>, <strong>base URL</strong>, and <strong>API key</strong> (your own OpenAI/Anthropic key, stored locally, masked, never uploaded). Use <em>Import CV</em> to parse a local PDF/DOCX/TXT, and <em>Set up profile</em> to add your name/skills.
+</div>
+
+<h2>Then what?</h2>
+<ul>
+  <li><strong>From an AI client</strong> (Claude Desktop / Claude Code / Cursor): register the MCP server and just talk — <em>“parse my CV, analyze this job, tailor my CV for it.”</em> The <code>system_check</code> tool reports the same status the dashboard shows.</li>
+  <li><strong>From the browser</strong>: the Chrome extension detects job postings on LinkedIn/Indeed/Lever/Greenhouse/Workday/SmartRecruiters and imports them to your local inbox with one click.</li>
+  <li><strong>Submission is always manual</strong>: the app prepares and previews; <em>you</em> submit on the employer's site, then record it. Nothing is ever auto-submitted.</li>
+</ul>
+
+<h2>Everything stays on your machine</h2>
+<p>CVs, applications, reminders, and your AI key live under <code>JOB_MCP_DATA_DIR</code>. The bridge binds <code>127.0.0.1</code> only. The only outbound calls are to the AI provider <em>you</em> chose (your key or local Ollama) and, on packaged builds, a GitHub update check. No CV text or PII is ever uploaded or logged.</p>
+
+<p class="sub" style="margin-top:14px">Full tool reference (40+ tools) and config details: see the README at <a href="https://github.com/firyomaefx/job-application-mcp">github.com/firyomaefx/job-application-mcp</a>.</p>
+
+</body>
+</html>

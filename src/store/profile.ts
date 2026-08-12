@@ -81,9 +81,23 @@ export function updateProfile(
   return next;
 }
 
-export function listCvs(profileId: number) {
+/**
+ * List CVs for a profile. By default returns only the ACTIVE version of each
+ * chain (is_active = 1) so the list reflects "current CVs". Pass
+ * `includeInactive: true` to see every version (history).
+ */
+export function listCvs(profileId: number, opts: { includeInactive?: boolean } = {}) {
   const db = openDb();
+  if (opts.includeInactive) {
+    return db
+      .prepare(
+        "SELECT id, label, source_path, created_at, parent_cv_id, is_active, updated_at FROM cvs WHERE profile_id = ? ORDER BY id"
+      )
+      .all(profileId);
+  }
   return db
-    .prepare("SELECT id, label, source_path, created_at FROM cvs WHERE profile_id = ? ORDER BY id")
+    .prepare(
+      "SELECT id, label, source_path, created_at, parent_cv_id, is_active, updated_at FROM cvs WHERE profile_id = ? AND is_active = 1 ORDER BY id"
+    )
     .all(profileId);
 }

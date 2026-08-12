@@ -26,7 +26,8 @@ Language: **TypeScript/Node (ESM, Node ≥ 22)**. Local DB: **`node:sqlite`**
 - `src/cv/parser.ts` — parse PDF/DOCX/TXT into plain text. `file_path` is
   allow-listed to `JOB_MCP_DATA_DIR` (+ `cvs/`) and `JOB_MCP_CV_DIRS`.
 - `src/ai/` — provider abstraction: `mock` (heuristic, local), `openai`,
-  `anthropic` (fetch-based, user's own key). Selected per-call via `getProvider`.
+  `anthropic` (fetch-based, user's own key), `ollama` (keyless local model via an
+  OpenAI-compatible endpoint, cost 0). Selected per-call via `getProvider`.
 - `src/licence/` — `index` (signed entitlement tokens, MAC-signed local store,
   offline grace), `credits` (ledger), `referral` (codes).
 - `src/payments/webhook.ts` — payment-webhook seam. Server-side ONLY; never
@@ -37,7 +38,10 @@ Language: **TypeScript/Node (ESM, Node ≥ 22)**. Local DB: **`node:sqlite`**
   `entitlement` (plan limits). No I/O here.
 - `cli/cli.ts` — human CLI: `job-mcp serve | serve:http | --help`.
 - `extension/` — Chrome MV3 extension that captures form fields and sends them
-  to the HTTP bridge for preview. Never submits.
+  to the HTTP bridge for preview. Never submits. Also detects job postings on
+  common job-board URLs (`content/extract.js` pure extractor +
+  `content/import-detector.js`) and offers one-click import → `analyze_job`.
+  The bridge token lives in `chrome.storage.local` (L4), not `sync`.
 - `desktop/` — Electron wrapper that forks the bridge and shows a dashboard.
   Separate package with its own `package.json`. Standalone: the HTTP bridge is
   esbuild-bundled into `desktop/bridge-bundle.mjs` (`npm run bundle:bridge`,

@@ -7,9 +7,10 @@ release receive security fixes.
 
 ## Reporting a vulnerability
 
-**Do not open a public GitHub issue for security problems.** Instead, email the
-maintainers at **security@example.com** (replace with a real contact before
-launch) with:
+**Do not open a public GitHub issue for security problems.** A real private
+security contact and GitHub private vulnerability reporting are not configured
+yet. This is a release blocker. Until the owner publishes one, contact the
+repository owner through an existing private channel with:
 
 - A description of the issue and its impact
 - Steps to reproduce, if possible
@@ -23,8 +24,8 @@ for a fix before public disclosure.
 The free core is **local-first**:
 
 - The stdio MCP server and the HTTP bridge bind to **loopback only** (127.0.0.1).
-- The free core makes **no outbound network calls**. If you did not configure a
-  Pro provider, nothing leaves your machine.
+- The default heuristic and Ollama paths can remain local. Configured remote AI,
+  update, or licence endpoints make explicit outbound requests.
 - CVs and applications are stored in `JOB_MCP_DATA_DIR` (default `./data`).
 
 Known hardening points to be aware of:
@@ -33,11 +34,12 @@ Known hardening points to be aware of:
   machine (or could reach 127.0.0.1), set `JOB_MCP_HTTP_TOKEN` and use the
   bearer token in the extension options and desktop app.
 - The bridge trusts the local user. Do not run it on a shared host without auth.
+- Provider keys entered through the desktop are process-session-only; legacy
+  plaintext settings rows are purged. Environment configuration remains supported.
 - CV parsing uses `pdf-parse` and `mammoth`. Treat parsed CV text as untrusted
   input (it is never `eval`'d, but don't feed adversarial files in production).
 
 ## Pro / cloud services (out of scope here)
 
-Paid services run on separate hosted infrastructure and have their own security
-documentation. This repository does not contain cloud credentials, payment
-secrets, or AI provider keys — and it must never store them in the desktop app.
+Paid services are not production-ready. The repository contains seams but no
+tenant-isolated hosted service. See `docs/SECURITY.md` and `docs/RELEASE_GATE.md`.

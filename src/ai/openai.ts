@@ -1,6 +1,6 @@
 import type { AiContext, AiProvider, AiResult, AiUsage } from "./provider.js";
 import { SYSTEM, tailorPrompt, coverPrompt, answerPrompt } from "./prompt.js";
-import { costFor } from "./usage.js";
+import { costFor, type ProviderName } from "./usage.js";
 
 /**
  * OpenAI provider. Uses fetch against the OpenAI chat completions endpoint —
@@ -8,9 +8,13 @@ import { costFor } from "./usage.js";
  *
  * This is a Pro path: the caller debits a credit before invoking. Job/question
  * content is framed as untrusted data via the shared prompt builder (N1).
+ *
+ * `priceKey` lets a subclass (e.g. Ollama, an OpenAI-compatible local server)
+ * report a different cost key without overriding `build()`.
  */
 export class OpenAiProvider implements AiProvider {
   name = "openai";
+  protected priceKey: ProviderName = "openai";
   constructor(
     private key: string,
     private model: string = "gpt-4o-mini",
@@ -51,7 +55,7 @@ export class OpenAiProvider implements AiProvider {
   }
 
   private build(text: string, usage: AiUsage, notes: string[]): AiResult {
-    return { text, provider: this.name, notes, usage, cost_usd: costFor("openai", usage) };
+    return { text, provider: this.name, notes, usage, cost_usd: costFor(this.priceKey, usage) };
   }
 
   async tailorCv(ctx: AiContext): Promise<AiResult> {

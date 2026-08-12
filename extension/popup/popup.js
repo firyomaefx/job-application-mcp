@@ -21,14 +21,34 @@ const els = {
   statusDot: document.getElementById("status-dot"),
   statusText: document.getElementById("status-text"),
   optionsLink: document.getElementById("options-link"),
+  importBtn: document.getElementById("import"),
+  jobSection: document.getElementById("job-section"),
+  jobTitle: document.getElementById("job-title"),
+  jobMeta: document.getElementById("job-meta"),
+  jobDesc: document.getElementById("job-desc"),
+  analyzeBtn: document.getElementById("analyze"),
 };
 
 let capturedFields = [];
+let detectedJob = null;
 
 // ── settings ────────────────────────────────────────────────
+// L4 fix: the bridge token is a LOCAL secret (it grants /call on the user's
+// bridge). Store it in chrome.storage.local, NOT sync (which is synced to the
+// user's Chrome account). bridgeUrl is non-secret and stays in sync. On first
+// load after upgrade we migrate any token still present in sync to local, then
+// clear it from sync.
 async function getSettings() {
-  const s = await chrome.storage.sync.get(DEFAULTS);
-  return s;
+  const sync = await chrome.storage.sync.get({ bridgeUrl: DEFAULTS.bridgeUrl, token: "" });
+  const local = await chrome.storage.local.get({ token: "" });
+  let token = local.token || "";
+  // one-time migration: move a token stranded in sync into local
+  if (!token && sync.token) {
+    token = sync.token;
+    await chrome.storage.local.set({ token });
+    await chrome.storage.sync.remove("token");
+  }
+  return { bridgeUrl: sync.bridgeUrl, token };
 }
 
 // ── errors ──────────────────────────────────────────────────
@@ -194,13 +214,125 @@ async function copyJson() {
   }
 }
 
+// ── import this job ─────────────────────────────────────────
+// On-demand detection is more reliable than the auto content script (covers
+// SPA navigations and pages outside the static matches). We inject extract.js
+// then a tiny function that reads the page and calls the shared parseJobPosting.
+function detectJobInPage() {
+  const jsonLd = Array.from(
+    document.querySelectorAll('script[type="application/ld+json"]')
+  )
+    .map((s) => s.textContent || "")
+    .join("\n");
+  return self.parseJobPosting({
+    jsonLdText: jsonLd,
+    title: document.title || "",
+    bodyText: (document.body && document.body.innerText) || "",
+    url: location.href,
+  });
+}
+
+async function importJob() {
+  clearError();
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab || !tab.id) {
+    showError("No active tab.");
+    return;
+  }
+  if (/^(chrome|edge|about):/i.test(tab.url ?? "")) {
+    showError("Can't detect a job on a browser-internal page. Open a career site.");
+    return;
+  }
+  try {
+    // inject the pure extractor, then the page reader
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content/extract.js"] });
+    const [res] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: detectJobInPage,
+    });
+    const job = res?.result;
+    if (!job) {
+      showError("No job posting detected on this page. Open a job listing and try again.");
+      els.jobSection.hidden = true;
+      return;
+    }
+    detectedJob = job;
+    renderJob();
+  } catch (e) {
+    showError(`Detect failed: ${e.message}`);
+  }
+}
+
+function renderJob() {
+  if (!detectedJob) {
+    els.jobSection.hidden = true;
+    return;
+  }
+  els.jobTitle.textContent = detectedJob.title || "(untitled job)";
+  const meta = [
+    detectedJob.company,
+    detectedJob.location,
+    detectedJob.source === "jsonld" ? "structured" : "fallback",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  els.jobMeta.textContent = meta;
+  const desc = (detectedJob.description || "").slice(0, 280);
+  els.jobDesc.textContent = desc + (detectedJob.description.length > 280 ? "…" : "");
+  els.jobSection.hidden = false;
+}
+
+async function analyzeJob() {
+  clearError();
+  if (!detectedJob) {
+    showError("Detect a job first.");
+    return;
+  }
+  const { bridgeUrl, token } = await getSettings();
+  const body = {
+    name: "analyze_job",
+    arguments: {
+      description: detectedJob.description,
+      title: detectedJob.title,
+    },
+  };
+  try {
+    const res = await fetch(`${bridgeUrl}/call`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+    els.result.hidden = false;
+    els.resultJson.textContent = JSON.stringify(data, null, 2);
+  } catch (e) {
+    showError(`Bridge call failed: ${e.message}`);
+  }
+}
+
 // ── wire up ─────────────────────────────────────────────────
 els.capture.addEventListener("click", captureFields);
 els.send.addEventListener("click", sendToBridge);
 els.copy.addEventListener("click", copyJson);
+els.importBtn.addEventListener("click", importJob);
+els.analyzeBtn.addEventListener("click", analyzeJob);
 els.optionsLink.addEventListener("click", (e) => {
   e.preventDefault();
   chrome.runtime.openOptionsPage();
+});
+
+// If the auto content script already detected a job on this tab, pre-fill it.
+chrome.storage.session.get(["lastJob", "lastJobUrl"]).then((s) => {
+  if (s && s.lastJob) {
+    detectedJob = s.lastJob;
+    renderJob();
+  }
 });
 
 checkBridge();

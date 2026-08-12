@@ -125,7 +125,7 @@ npm run build      # -> dist/
 ### Verify it works
 
 ```bash
-npm test           # 40 unit tests (scoring, store, licence, credits, ai, payments, audit-fixes)
+npm test           # full unit/integration test suite
 node dist/cli/cli.js --help
 ```
 
@@ -305,7 +305,7 @@ placeholders for future hosted Pro/cloud services (see `.env.example`):
 
 | Variable | Purpose |
 | --- | --- |
-| `AI_PROVIDER` / `AI_API_KEY` | `openai` or `anthropic` + your own key → real AI drafts for `tailor_cv` / `cover_letter` / `draft_answer`. Free users use this without any subscription. |
+| `AI_PROVIDER` / `AI_API_KEY` | `openai` or `anthropic` + your own key → real AI drafts for `tailor_cv` / `cover_letter` / `draft_answer`. Keys entered in the desktop UI are session-only; use the environment for restart persistence. |
 | `AI_MODEL` / `AI_BASE_URL` | Optional model + base URL override (e.g. an OpenAI-compatible endpoint). |
 | `JOB_MCP_LICENCE_SERVER` | Pro licence activation endpoint (hosted service). |
 | `SUPABASE_URL` / `SUPABASE_ANON_KEY` | Cloud sync & auth (Pro, hosted). |
@@ -320,7 +320,7 @@ job-application-mcp/
 │   ├── index.ts           # stdio MCP server entrypoint
 │   ├── http.ts            # local HTTP bridge entrypoint (127.0.0.1)
 │   ├── server.ts          # server factory + tool registry
-│   ├── tools/             # one file per MCP tool (23 total)
+│   ├── tools/             # task and compatibility MCP tools
 │   │   ├── types.ts       # ToolDef / AnyTool / result helpers
 │   │   ├── profile.ts     # get/update_profile
 │   │   ├── cv.ts          # parse_cv, list_cvs
@@ -428,11 +428,24 @@ auditable — a baseline you can replace with the Pro AI scorer later.
 
 ## Privacy & data
 
-- **Local-first.** CVs, profile, and applications live in `JOB_MCP_DATA_DIR`
-  (default `./data`), which is gitignored. The free core makes **no network calls**.
+- **Local-first by default.** CVs, profile, and applications live in
+  `JOB_MCP_DATA_DIR` (default `./data`), which is gitignored. Ollama and the
+  heuristic stay local; configuring OpenAI, Anthropic, an update feed, or a
+  licence endpoint enables the corresponding outbound request.
+- **Provider keys are not stored in SQLite.** Desktop-entered keys last only for
+  the bridge process; environment variables can provide restart persistence.
 - **No PII in logs.** CV text and personal fields aren't logged at info level.
 - **Sensitive fields are flagged.** `autofill_form` marks salary, authorization,
   gender, disability, and consent fields as `requires_user_review: true`.
+
+## Windows alpha installer
+
+GitHub prereleases provide a standalone x64 one-click Setup executable. The
+installer bundles the local bridge, so a separate Node.js installation is not
+required. Version 0.4.2 is intentionally **unsigned alpha software**: Windows
+SmartScreen may display a warning. Verify the downloaded file against
+`SHA256SUMS.txt` from the same GitHub prerelease before running it. This is not
+a production-ready hosted or paid release.
 - **You can wipe everything** by deleting the data directory.
 
 ---

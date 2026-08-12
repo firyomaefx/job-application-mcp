@@ -23,6 +23,12 @@ export interface Cv {
   source_path: string | null;
   text: string;
   created_at: string;
+  // Phase 2: versioning. parent_cv_id links a revised CV to its predecessor;
+  // is_active marks the current version in the chain; updated_at records the
+  // last edit. Older rows (pre-v4) have parent_cv_id NULL and is_active 1.
+  parent_cv_id: number | null;
+  is_active: number; // 0 | 1 (SQLite has no native bool)
+  updated_at: string;
 }
 
 export interface Job {
@@ -34,6 +40,21 @@ export interface Job {
   description: string;
   // Skills/keywords extracted from the description during analysis.
   keywords: string[];
+  created_at: string;
+  // Phase 3: pipeline inbox status. 'new' on import; triaged/applied/archived
+  // are set by the user. Applied is also derivable from an application row.
+  inbox_status: "new" | "triaged" | "applied" | "archived";
+}
+
+export interface Reminder {
+  id: number;
+  profile_id: number;
+  application_id: number | null;
+  job_id: number | null;
+  kind: "follow_up" | "interview" | "custom";
+  title: string;
+  due_at: string; // ISO date
+  done: number; // 0 | 1
   created_at: string;
 }
 

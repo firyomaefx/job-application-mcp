@@ -29,9 +29,22 @@ Environment:
   JOB_MCP_DATA_DIR      Local data directory (default ./data)
   JOB_MCP_HTTP_PORT     HTTP bridge port (default 8787)
   JOB_MCP_HTTP_TOKEN    Optional bearer token for the HTTP bridge
+  AI_PROVIDER           mock | openai | anthropic | ollama (default mock)
+  AI_API_KEY            Your own key for openai/anthropic (ollama needs none)
+  AI_MODEL              Model id (ollama default: llama3.1)
+  AI_BASE_URL           Override endpoint (ollama default: http://localhost:11434/v1)
 `;
 
+/** `--ai <provider>` convenience flag for serve/serve:http. */
+function applyAiFlag(): void {
+  const aiIdx = process.argv.indexOf("--ai");
+  if (aiIdx !== -1 && process.argv[aiIdx + 1]) {
+    process.env.AI_PROVIDER = process.argv[aiIdx + 1];
+  }
+}
+
 async function main(): Promise<void> {
+  applyAiFlag();
   const arg = process.argv[2];
   if (!arg || arg === "--help" || arg === "-h" || arg === "help") {
     process.stdout.write(HELP);
