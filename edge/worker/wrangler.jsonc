@@ -1,0 +1,26 @@
+{
+  "name": "job-application-mcp-edge",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-11-20",
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true },
+    "traces": { "enabled": true }
+  },
+  "vars": {
+    "ALLOWED_ORIGIN": "http://localhost:8788"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "PENDING",
+      "id": "REPLACE_WITH_KV_ID",
+      "preview_id": "REPLACE_WITH_KV_PREVIEW_ID"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "RESUMES",
+      "bucket_name": "job-mcp-resumes"
+    }
+  ]
+}
