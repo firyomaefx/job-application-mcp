@@ -50,6 +50,7 @@ function dataDir() {
 
 let win = null;
 let bridgeProc = null;
+let campaignProc = null;
 let bridgeStatus = "stopped"; // 'stopped' | 'starting' | 'running' | 'crashed'
 
 function bridgeUrl(p = BRIDGE_PORT) {
@@ -84,6 +85,7 @@ function startBridge() {
       JOB_MCP_HTTP_TOKEN: BRIDGE_TOKEN,
       // The chat default is two paste tools. The desktop app uses the full list.
       JOB_MCP_ALL_TOOLS: "1",
+      JOB_MCP_AUTO_APPLY: "1",
     },
     stdio: "pipe",
     serviceName: "Job Application MCP Bridge",
@@ -365,9 +367,110 @@ for (const a of process.argv) {
 }
 ipcMain.on("app:launchIntent", (e) => { e.returnValue = launchIntent; });
 
+// ── Campaign: CV import, JobSpy, Playwright worker ─────────────
+const { dialog } = require("electron");
+
+function sendCampaignLog(line) {
+  if (win && !win.isDestroyed()) win.webContents.send("campaign:log", { line });
+}
+
+function stopCampaignWorker() {
+  if (campaignProc) {
+    try {
+      campaignProc.kill("SIGTERM");
+    } catch {}
+    campaignProc = null;
+    sendCampaignLog("Worker stopped.");
+  }
+}
+
+function startCampaignWorker() {
+  if (campaignProc) return { ok: false, reason: "already-running" };
+  if (bridgeStatus !== "running") return { ok: false, reason: "bridge-not-running" };
+  const workerScript = path.join(__dirname, "runner", "campaign-worker.mjs");
+  if (!fs.existsSync(workerScript)) {
+    return { ok: false, reason: `Worker not found: ${workerScript}` };
+  }
+  const DATA_DIR = dataDir();
+  campaignProc = utilityProcess.fork(workerScript, [], {
+    env: {
+      ...process.env,
+      JOB_MCP_DATA_DIR: DATA_DIR,
+      JOB_MCP_BRIDGE_URL: bridgeUrl(),
+      JOB_MCP_HTTP_TOKEN: BRIDGE_TOKEN,
+      JOB_MCP_BROWSER_PROFILE: path.join(DATA_DIR, "playwright-profile"),
+    },
+    stdio: "pipe",
+    serviceName: "Job MCP Campaign Worker",
+  });
+  campaignProc.stdout?.on("data", (d) => sendCampaignLog(d.toString().trimEnd()));
+  campaignProc.stderr?.on("data", (d) => sendCampaignLog(d.toString().trimEnd()));
+  campaignProc.on("exit", (code) => {
+    campaignProc = null;
+    sendCampaignLog(`Worker exited (code ${code}).`);
+  });
+  sendCampaignLog("Playwright worker started.");
+  return { ok: true };
+}
+
+ipcMain.handle("campaign:importCv", async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+    title: "Import résumé",
+    properties: ["openFile"],
+    filters: [
+      { name: "CV", extensions: ["pdf", "docx", "doc", "txt"] },
+      { name: "All", extensions: ["*"] },
+    ],
+  });
+  if (canceled || !filePaths?.length) return { ok: false, canceled: true };
+  const src = filePaths[0];
+  const destDir = path.join(dataDir(), "cvs");
+  if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
+  const base = path.basename(src);
+  const dest = path.join(destDir, base);
+  fs.copyFileSync(src, dest);
+  return { ok: true, file_path: dest };
+});
+
+ipcMain.handle("campaign:jobspy", async (_e, config) => {
+  const script = path.join(REPO_ROOT, "scripts", "jobspy-import.mjs");
+  if (!fs.existsSync(script)) return { ok: false, error: "jobspy-import.mjs not found" };
+  return new Promise((resolve) => {
+    const child = utilityProcess.fork(script, [JSON.stringify(config || {})], {
+      cwd: REPO_ROOT,
+      env: process.env,
+      stdio: "pipe",
+      serviceName: "JobSpy import",
+    });
+    let out = "";
+    let err = "";
+    child.stdout?.on("data", (d) => { out += d; });
+    child.stderr?.on("data", (d) => { err += d; });
+    child.on("exit", (code) => {
+      try {
+        const data = JSON.parse(out.trim() || "{}");
+        resolve({ ...data, exit_code: code, stderr: err.trim() || undefined });
+      } catch {
+        resolve({ ok: false, error: err || out || `exit ${code}` });
+      }
+    });
+  });
+});
+
+ipcMain.handle("campaign:startWorker", () => startCampaignWorker());
+ipcMain.handle("campaign:stopWorker", () => {
+  stopCampaignWorker();
+  return { ok: true };
+});
+ipcMain.handle("campaign:workerRunning", () => ({ running: Boolean(campaignProc) }));
+
 app.on("window-all-closed", () => {
+  stopCampaignWorker();
   stopBridge();
   if (process.platform !== "darwin") app.quit();
 });
 
-app.on("before-quit", () => stopBridge());
+app.on("before-quit", () => {
+  stopCampaignWorker();
+  stopBridge();
+});

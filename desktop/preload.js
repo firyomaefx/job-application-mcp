@@ -22,4 +22,14 @@ contextBridge.exposeInMainWorld("jobMcp", {
     ipcRenderer.on("bridge:status", handler);
     return () => ipcRenderer.removeListener("bridge:status", handler);
   },
+  importCvFile: () => ipcRenderer.invoke("campaign:importCv"),
+  jobSpySearch: (config) => ipcRenderer.invoke("campaign:jobspy", config),
+  startCampaignWorker: () => ipcRenderer.invoke("campaign:startWorker"),
+  stopCampaignWorker: () => ipcRenderer.invoke("campaign:stopWorker"),
+  campaignWorkerRunning: () => ipcRenderer.invoke("campaign:workerRunning"),
+  onCampaignLog: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on("campaign:log", handler);
+    return () => ipcRenderer.removeListener("campaign:log", handler);
+  },
 });

@@ -40,7 +40,140 @@ const els = {
   aiBaseUrl: document.getElementById("ai-base-url"),
   aiApiKey: document.getElementById("ai-api-key"),
   aiClearKey: document.getElementById("ai-clear-key"),
+  campaignPickCv: document.getElementById("campaign-pick-cv"),
+  campaignCvLabel: document.getElementById("campaign-cv-label"),
+  campaignUrls: document.getElementById("campaign-urls"),
+  campaignSearchTitle: document.getElementById("campaign-search-title"),
+  campaignSearchLoc: document.getElementById("campaign-search-loc"),
+  campaignJobspy: document.getElementById("campaign-jobspy"),
+  campaignJobspyStatus: document.getElementById("campaign-jobspy-status"),
+  campaignMinScore: document.getElementById("campaign-min-score"),
+  campaignMaxDay: document.getElementById("campaign-max-day"),
+  campaignStart: document.getElementById("campaign-start"),
+  campaignWorkerStart: document.getElementById("campaign-worker-start"),
+  campaignWorkerStop: document.getElementById("campaign-worker-stop"),
+  campaignLog: document.getElementById("campaign-log"),
 };
+
+let campaignCvId = null;
+let campaignJobUrls = [];
+
+function campaignAppendLog(line) {
+  if (!line) return;
+  els.campaignLog.textContent = (els.campaignLog.textContent ? `${els.campaignLog.textContent}\n` : "") + line;
+  els.campaignLog.scrollTop = els.campaignLog.scrollHeight;
+}
+
+window.jobMcp.onCampaignLog?.(({ line }) => campaignAppendLog(line));
+
+function parseUrlLines(text) {
+  return String(text || "")
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => /^https?:\/\//i.test(l));
+}
+
+async function campaignImportCv() {
+  setError("");
+  const pick = await window.jobMcp.importCvFile();
+  if (!pick?.ok || pick.canceled) return;
+  const parsed = await call("parse_cv", { file_path: pick.file_path, label: "campaign-cv" });
+  campaignCvId = parsed?.data?.cv_id ?? null;
+  els.campaignCvLabel.textContent = campaignCvId
+    ? `CV #${campaignCvId} · ${pick.file_path.split(/[/\\]/).pop()}`
+  : "Import failed";
+  await refresh();
+}
+
+async function campaignJobSpy() {
+  setError("");
+  const term = els.campaignSearchTitle.value.trim();
+  if (!term) {
+    setError("Enter a search title for JobSpy.");
+    return;
+  }
+  els.campaignJobspyStatus.textContent = "Searching…";
+  const res = await window.jobMcp.jobSpySearch({
+    search_term: term,
+    location: els.campaignSearchLoc.value.trim(),
+    results_wanted: 15,
+    site_name: ["indeed", "jobstreet", "linkedin", "glassdoor"],
+  });
+  if (!res?.ok) {
+    els.campaignJobspyStatus.textContent = res?.error || "JobSpy failed";
+    return;
+  }
+  const lines = [];
+  for (const job of res.jobs || []) {
+    if (!job.url) continue;
+    await call("analyze_job", {
+      description: job.description,
+      title: job.title,
+      company: job.company,
+      url: job.url,
+      store: true,
+    });
+    lines.push(job.url);
+  }
+  if (lines.length) {
+    const existing = parseUrlLines(els.campaignUrls.value);
+    els.campaignUrls.value = Array.from(new Set([...existing, ...lines])).join("\n");
+  }
+  els.campaignJobspyStatus.textContent =
+    `${res.count ?? 0} listing(s) imported — use Start campaign to enqueue ATS URLs (LinkedIn apply links are skipped).`;
+}
+
+async function campaignStart() {
+  setError("");
+  const urls = Array.from(new Set([...parseUrlLines(els.campaignUrls.value), ...campaignJobUrls]));
+  if (!urls.length) {
+    setError("Add at least one apply URL or run JobSpy search.");
+    return;
+  }
+  if (!campaignCvId) {
+    const cvs = (await call("list_cvs", {})).data || [];
+    if (cvs.length) campaignCvId = cvs[cvs.length - 1].id;
+  }
+  if (!campaignCvId) {
+    setError("Import a résumé first.");
+    return;
+  }
+  const min = Number(els.campaignMinScore.value);
+  const max = Number(els.campaignMaxDay.value);
+  campaignAppendLog(`Starting campaign (${urls.length} URL(s))…`);
+  const res = await call("start_campaign", {
+    urls,
+    cv_id: campaignCvId,
+    min_match_score: Number.isFinite(min) ? min : 0,
+    max_applies_per_day: Number.isFinite(max) ? max : 10,
+  });
+  campaignAppendLog(res.summary || "Campaign started.");
+  if (res.data?.results) {
+    for (const row of res.data.results) {
+      campaignAppendLog(`  ${row.status}: ${row.url}${row.reason ? ` — ${row.reason}` : ""}`);
+    }
+  }
+  await refresh();
+}
+
+async function campaignWorkerStart() {
+  const r = await window.jobMcp.startCampaignWorker();
+  if (!r?.ok) {
+    setError(r?.reason === "bridge-not-running" ? "Start the bridge first." : `Worker: ${r?.reason || "failed"}`);
+    return;
+  }
+  campaignAppendLog("Playwright worker requested.");
+}
+
+async function campaignWorkerStop() {
+  await window.jobMcp.stopCampaignWorker();
+}
+
+if (els.campaignPickCv) els.campaignPickCv.addEventListener("click", campaignImportCv);
+if (els.campaignJobspy) els.campaignJobspy.addEventListener("click", campaignJobSpy);
+if (els.campaignStart) els.campaignStart.addEventListener("click", campaignStart);
+if (els.campaignWorkerStart) els.campaignWorkerStart.addEventListener("click", campaignWorkerStart);
+if (els.campaignWorkerStop) els.campaignWorkerStop.addEventListener("click", campaignWorkerStop);
 
 let baseUrl = "http://127.0.0.1:8787";
 let bridgeToken = ""; // loopback bearer (from bridgeInfo); "" = no auth

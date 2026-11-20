@@ -79,3 +79,25 @@ test("auto-apply: execute_autofill with trusted salary default", async () => {
   assert.equal(exec.data.can_auto_submit, true);
   assert.ok(exec.data.approval?.approval_token);
 });
+
+test("auto-apply: start_campaign enqueues ATS URLs", async () => {
+  openDb();
+  resetDb();
+  getDefaultProfile();
+  await call("set_apply_defaults", { min_match_score: 0, max_applies_per_day: 5 });
+
+  const cvDir = resolve("./data-test-auto-apply", "cvs");
+  if (!existsSync(cvDir)) mkdirSync(cvDir, { recursive: true });
+  const cvFile = join(cvDir, "campaign-cv.txt");
+  writeFileSync(cvFile, "Skills: Node.js, TypeScript, React", "utf8");
+  const parseRes: any = await call("parse_cv", { file_path: cvFile });
+
+  const url = "https://boards.greenhouse.io/example/jobs/999";
+  const camp: any = await call("start_campaign", {
+    urls: [url],
+    cv_id: parseRes.data.cv_id,
+  });
+  assert.equal(camp.data.ready_count, 1);
+  assert.equal(camp.data.results[0].status, "ready");
+  assert.ok(camp.data.results[0].queue_id);
+});

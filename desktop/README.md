@@ -6,8 +6,12 @@ small dashboard: server status, your candidate profile, and your applications.
 The app is **standalone**: the HTTP bridge is esbuild-bundled into a single
 self-contained ESM file (`bridge-bundle.mjs`) and launched with Electron's
 supported `utilityProcess` API, so **no system Node.js is required** on the
-user's machine. It only **reads** local data — submission
-stays manual, as in the rest of the project.
+user's machine for the bridge.
+
+**Primary auto-apply path:** the **Auto-apply campaign** screen — import a résumé,
+paste apply URLs or run optional JobSpy search, **Start campaign**, then **Start
+Playwright worker**. See [docs/AUTO_APPLY_CAMPAIGN.md](../docs/AUTO_APPLY_CAMPAIGN.md).
+The bridge runs with `JOB_MCP_AUTO_APPLY=1` and `JOB_MCP_ALL_TOOLS=1`.
 
 ## Prerequisites (development only)
 
@@ -40,6 +44,17 @@ Buttons:
 - **Refresh** — re-fetch profile + applications.
 - **Restart bridge** — kill and respawn the child process.
 - **Open data folder** — reveal `JOB_MCP_DATA_DIR` in your file manager.
+- **Campaign** — `start_campaign` + optional Playwright queue worker (`desktop/runner/campaign-worker.mjs`).
+
+### Playwright (optional, for file upload + unattended queue)
+
+```bash
+cd desktop
+npm install playwright
+npx playwright install chromium
+```
+
+Without Playwright, use the Chrome extension after **Start campaign**.
 
 ## Configuration (env vars, set before `npm start`)
 

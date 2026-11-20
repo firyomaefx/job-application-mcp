@@ -30,6 +30,7 @@ import {
   reportApplyStepTool,
   pauseForHumanTool,
   confirmApplyAttemptTool,
+  startCampaignTool,
 } from "./auto-apply.js";
 import { analyticsTool, statusTool } from "./analytics.js";
 import { systemCheckTool } from "./system_check.js";
@@ -82,6 +83,7 @@ export const tools: AnyTool[] = [
   reportApplyStepTool,
   pauseForHumanTool,
   confirmApplyAttemptTool,
+  startCampaignTool,
   // pipeline: reminders (Phase 3)
   addReminderTool,
   listRemindersTool,

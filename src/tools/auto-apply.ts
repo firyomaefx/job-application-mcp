@@ -24,6 +24,7 @@ import {
   getApplication,
   getJob,
   getCv,
+  saveJob,
   saveApplication,
   updateApplicationStatus,
   updateApplication,
@@ -438,6 +439,100 @@ const confirmAttemptSchema = z.object({
 });
 
 /** Validates gate before the extension clicks submit (no token consumption). */
+// ── campaign ────────────────────────────────────────────────────
+
+const startCampaignSchema = z.object({
+  urls: z.array(z.string().url()).min(1).max(50),
+  cv_id: z.number().int().optional(),
+  min_match_score: z.number().int().min(0).max(100).optional(),
+  max_applies_per_day: z.number().int().min(1).max(100).optional(),
+});
+
+function placeholderJobForUrl(url: string) {
+  let title = "Role (ATS apply)";
+  try {
+    const u = new URL(url);
+    const seg = u.pathname.split("/").filter(Boolean).pop();
+    if (seg) title = decodeURIComponent(seg).replace(/[-_+]/g, " ").slice(0, 120);
+  } catch {
+    /* keep default title */
+  }
+  const description =
+    `${title}\n\nApply via employer ATS.\n\nPosting URL: ${url}\n\n` +
+    "Replace this stub with the full posting text for better match scores.";
+  return {
+    title,
+    company: null as string | null,
+    url,
+    description,
+    keywords: extractKeywords(description, 24),
+  };
+}
+
+export const startCampaignTool: ToolDef<typeof startCampaignSchema> = {
+  name: "start_campaign",
+  description:
+    "Enqueue one or more employer ATS apply URLs, prepare applications, and return ready queue ids. " +
+    "Creates a stub job record per URL when none exists. Requires JOB_MCP_AUTO_APPLY=1. " +
+    "Run the desktop Playwright worker or the extension to process the queue.",
+  inputSchema: startCampaignSchema,
+  run: async (input) => {
+    requireAutoApplyEnabled();
+    const profile = getDefaultProfile();
+
+    if (input.min_match_score != null || input.max_applies_per_day != null) {
+      setApplyDefaults(profile.id, {
+        min_match_score: input.min_match_score,
+        max_applies_per_day: input.max_applies_per_day,
+      });
+    }
+
+    const results: {
+      url: string;
+      queue_id?: number;
+      status: "ready" | "skipped" | "failed";
+      reason?: string;
+    }[] = [];
+
+    for (const url of input.urls) {
+      const platform = classifyApplyUrl(url);
+      if (!platform.allowed) {
+        results.push({ url, status: "skipped", reason: platform.reason });
+        continue;
+      }
+      const stub = placeholderJobForUrl(url);
+      const job = saveJob(profile.id, stub);
+      const item = enqueueApply(profile.id, url, job.id);
+      updateQueueItem(item.id, { adapter_id: platform.adapter_id });
+
+      const prep = await Promise.resolve(
+        prepareApplicationTool.run({ queue_id: item.id, cv_id: input.cv_id }),
+      );
+      const ready = getQueueItem(item.id);
+      if (ready?.status === "ready") {
+        results.push({ url, queue_id: item.id, status: "ready" });
+      } else {
+        results.push({
+          url,
+          queue_id: item.id,
+          status: "failed",
+          reason: ready?.error || ready?.pause_reason || prep.summary,
+        });
+      }
+    }
+
+    const readyCount = results.filter((r) => r.status === "ready").length;
+    return {
+      summary: `Campaign prepared: ${readyCount}/${input.urls.length} queue item(s) ready.`,
+      data: { results, ready_count: readyCount },
+      notes: [
+        "Desktop: Campaign → Start worker (Playwright).",
+        "Stub job descriptions score low — paste full postings or use JobSpy import for better matches.",
+      ],
+    };
+  },
+};
+
 export const confirmApplyAttemptTool: ToolDef<typeof confirmAttemptSchema> = {
   name: "confirm_apply_attempt",
   description:
