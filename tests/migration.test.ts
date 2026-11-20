@@ -41,7 +41,7 @@ test("schema v6 upgrades a legacy CV table without losing data", () => {
   assert.equal(row.is_active, 1);
   assert.equal(row.updated_at, "2026-01-02");
   const version = migrated.prepare("SELECT value FROM meta WHERE key = 'schema_version'").get() as { value: string };
-  assert.equal(version.value, "6");
+  assert.equal(version.value, "7");
   const integrity = migrated.prepare("PRAGMA integrity_check").get() as { integrity_check: string };
   assert.equal(integrity.integrity_check, "ok");
 });

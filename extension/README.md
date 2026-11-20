@@ -2,7 +2,9 @@
 
 A Manifest V3 extension that captures form fields on a career page and asks
 your **local** Job Application MCP HTTP bridge to **preview** an autofill
-mapping. It never submits anything.
+mapping. By default it never submits anything. With **`JOB_MCP_AUTO_APPLY=1`**
+on your local bridge, it can fill and click Submit on **employer ATS** pages
+after `execute_autofill` approves the mapping (not LinkedIn/Indeed).
 
 ## What it does
 
@@ -19,9 +21,8 @@ mapping. It never submits anything.
 
 ## What it does NOT do
 
-- ❌ Never submits a form.
-- ❌ Never autofills a real field in the page. (A future Pro version might, with
-  explicit per-field confirmation.)
+- ❌ Never submits unless `JOB_MCP_AUTO_APPLY=1` and you click **Auto-apply**.
+- ❌ Never autofills the page unless auto-apply mode is on and mapping is approved.
 - ❌ Does not touch LinkedIn or Indeed — those are analysis-only per their ToS.
 - ❌ Sends data only to `127.0.0.1` (your own machine).
 

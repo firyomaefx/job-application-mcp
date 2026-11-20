@@ -10,7 +10,7 @@
 
 - [ ] This change does **not** gate any free-core feature behind a paid or network service.
 - [ ] No CV text or PII is logged at info level.
-- [ ] Submission stays manual (no new automated submission paths).
+- [ ] Submission stays manual by default, OR new auto-submit paths are behind `JOB_MCP_AUTO_APPLY=1` with caps and ATS-only guards.
 
 ## Tests
 

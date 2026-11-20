@@ -110,11 +110,11 @@ test("default tool list is the two paste tools and returns text only", () => {
   assert.equal(toContent(checked)[0]?.text.split("\n")[0], "Role: Untitled role");
 });
 
-test("JOB_MCP_ALL_TOOLS=1 lists the existing 41 tools", () => {
+test("JOB_MCP_ALL_TOOLS=1 lists the full tool set", () => {
   process.env.JOB_MCP_ALL_TOOLS = "1";
   try {
-    assert.equal(tools.length, 41);
-    assert.equal(listedTools().length, 41);
+    assert.equal(listedTools().length, tools.length);
+    assert.ok(tools.length >= 41);
     assert.deepEqual(
       listedTools().map((t) => t.name),
       tools.map((t) => t.name),

@@ -16,6 +16,27 @@ chrome.runtime.onInstalled.addListener((details) => {
 
 // Store the most recent job detected on a tab so the popup can read it on open.
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg && msg.type === "enqueue-apply" && msg.url) {
+    chrome.storage.sync.get({ bridgeUrl: "http://127.0.0.1:8787" }).then(async (sync) => {
+      const local = await chrome.storage.local.get({ token: "" });
+      try {
+        await fetch(`${sync.bridgeUrl}/call`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(local.token ? { Authorization: `Bearer ${local.token}` } : {}),
+          },
+          body: JSON.stringify({
+            name: "enqueue_apply",
+            arguments: { url: msg.url, job_id: msg.job_id },
+          }),
+        });
+      } catch {
+        // bridge offline
+      }
+    });
+    return;
+  }
   if (msg && msg.type === "job-detected" && msg.job && sender.tab && sender.tab.id != null) {
     const tabId = sender.tab.id;
     chrome.storage.session

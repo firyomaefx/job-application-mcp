@@ -30,6 +30,22 @@ export function isSensitiveField(name: string, label?: string): boolean {
 export function guessFieldKey(name: string, label?: string): string {
   const s = `${name} ${label ?? ""}`.toLowerCase();
   if (s.includes("cover")) return "cover_letter";
+  if (
+    s.includes("authorized") ||
+    s.includes("authorised") ||
+    s.includes("visa") ||
+    s.includes("sponsor") ||
+    s.includes("work authorization") ||
+    s.includes("legally authorized")
+  ) {
+    return "work_authorization";
+  }
+  if (s.includes("salary") || s.includes("compensation") || s.includes("pay")) {
+    return "salary_expectation";
+  }
+  if (s.includes("notice")) return "notice_period";
+  if (s.includes("relocat")) return "relocation";
+  if (s.includes("linkedin")) return "linkedin_url";
   if (s.includes("mail")) return "email";
   if (s.includes("phone") || s.includes("mobile") || s.includes("tel")) return "phone";
   if (s.includes("location") || s.includes("city") || s.includes("address")) return "location";

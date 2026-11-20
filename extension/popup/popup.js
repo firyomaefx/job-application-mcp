@@ -14,6 +14,8 @@ const els = {
   fieldsList: document.getElementById("fields"),
   count: document.getElementById("count"),
   appId: document.getElementById("application-id"),
+  queueId: document.getElementById("queue-id"),
+  queueIdRow: document.getElementById("queue-id-row"),
   result: document.getElementById("result"),
   resultJson: document.getElementById("result-json"),
   error: document.getElementById("error"),
@@ -27,10 +29,16 @@ const els = {
   jobMeta: document.getElementById("job-meta"),
   jobDesc: document.getElementById("job-desc"),
   analyzeBtn: document.getElementById("analyze"),
+  autoApplyBtn: document.getElementById("auto-apply"),
+  enqueueBtn: document.getElementById("enqueue"),
+  tagline: document.getElementById("tagline"),
+  footerHint: document.getElementById("footer-hint"),
 };
 
 let capturedFields = [];
 let detectedJob = null;
+let autoApplyEnabled = false;
+let lastExecutePayload = null;
 
 // ── settings ────────────────────────────────────────────────
 // L4 fix: the bridge token is a LOCAL secret (it grants /call on the user's
@@ -62,6 +70,21 @@ function clearError() {
 }
 
 // ── bridge health ───────────────────────────────────────────
+async function bridgeCall(name, args) {
+  const { bridgeUrl, token } = await getSettings();
+  const res = await fetch(`${bridgeUrl}/call`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ name, arguments: args }),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.ok) throw new Error(data.error || data.summary || `HTTP ${res.status}`);
+  return data;
+}
+
 async function checkBridge() {
   els.status.hidden = false;
   const { bridgeUrl, token } = await getSettings();
@@ -73,9 +96,26 @@ async function checkBridge() {
     const data = await res.json();
     els.statusDot.className = "dot dot-on";
     els.statusText.textContent = `Bridge: up (${data?.data?.tools?.length ?? "?"} tools)`;
+    try {
+      const defs = await bridgeCall("get_apply_defaults", {});
+      autoApplyEnabled = Boolean(defs?.data?.auto_apply_enabled);
+    } catch {
+      autoApplyEnabled = false;
+    }
+    els.autoApplyBtn.hidden = !autoApplyEnabled;
+    els.enqueueBtn.hidden = !autoApplyEnabled;
+    els.queueIdRow.hidden = !autoApplyEnabled;
+    if (autoApplyEnabled) {
+      els.tagline.textContent = "Auto-apply mode ON — ATS sites only · you set JOB_MCP_AUTO_APPLY=1";
+      els.footerHint.textContent =
+        "Auto-apply fills and may click Submit when mapping is approved. LinkedIn/Indeed apply blocked.";
+    }
   } catch (e) {
     els.statusDot.className = "dot dot-off";
     els.statusText.textContent = "Bridge: offline — start `npm run serve:http`";
+    autoApplyEnabled = false;
+    els.autoApplyBtn.hidden = true;
+    els.enqueueBtn.hidden = true;
   }
 }
 
@@ -175,33 +215,112 @@ async function sendToBridge() {
     showError("Enter a valid Application ID first (from match_cv/save_application).");
     return;
   }
-  const { bridgeUrl, token } = await getSettings();
-  const body = {
-    name: "autofill_form",
-    arguments: {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const url = tab?.url ?? "";
+    const tool = autoApplyEnabled ? "execute_autofill" : "autofill_form";
+    const args = {
       application_id: appId,
       form_fields: capturedFields.map((f) => ({ name: f.name, label: f.label, type: f.type })),
-    },
-  };
-  try {
-    const res = await fetch(`${bridgeUrl}/call`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    if (!res.ok || !data.ok) {
-      throw new Error(data.error || `HTTP ${res.status}`);
+    };
+    if (autoApplyEnabled) {
+      args.url = url;
+      args.issue_approval_token = true;
     }
+    const data = await bridgeCall(tool, args);
+    lastExecutePayload = autoApplyEnabled ? data?.data : null;
     els.result.hidden = false;
     els.resultJson.textContent = JSON.stringify(data, null, 2);
   } catch (e) {
     showError(`Bridge call failed: ${e.message}`);
   }
 }
+
+async function runAutoApplyInTab() {
+  clearError();
+  if (!autoApplyEnabled) {
+    showError("Enable JOB_MCP_AUTO_APPLY=1 on the bridge first.");
+    return;
+  }
+  if (!lastExecutePayload?.can_auto_submit) {
+    showError("Run preview/execute_autofill first — mapping must be approved with no blocked fields.");
+    return;
+  }
+  const appId = Number(els.appId.value);
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) {
+    showError("No active tab.");
+    return;
+  }
+  try {
+    const payload = {
+      mapping: lastExecutePayload.mapping,
+      adapter: lastExecutePayload.adapter,
+      submit: true,
+    };
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ["content/apply-runner.js"],
+    });
+    const [res] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: (p) => {
+        if (typeof globalThis.jobMcpApplyInPage === "function") {
+          return globalThis.jobMcpApplyInPage(p);
+        }
+        return { ok: false, error: "apply runner not loaded on page" };
+      },
+      args: [payload],
+    });
+    const outcome = res?.result;
+    if (outcome?.paused) {
+      showError(outcome.reason);
+      return;
+    }
+    if (outcome?.submitted && lastExecutePayload.approval?.approval_token) {
+      await bridgeCall("confirm_submission", {
+        application_id: appId,
+        approval_token: lastExecutePayload.approval.approval_token,
+        confirmation: "auto-apply via extension",
+      });
+      const queueId = Number(els.queueId?.value);
+      if (queueId > 0) {
+        await bridgeCall("report_apply_step", { queue_id: queueId, step: "submitted" });
+      }
+    }
+    els.result.hidden = false;
+    els.resultJson.textContent = JSON.stringify(outcome, null, 2);
+  } catch (e) {
+    showError(`Auto-apply failed: ${e.message}`);
+  }
+}
+
+async function enqueueCurrentPage() {
+  clearError();
+  if (!autoApplyEnabled) {
+    showError("Enable JOB_MCP_AUTO_APPLY=1 on the bridge first.");
+    return;
+  }
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const url = tab?.url;
+  if (!url || !/^https:/.test(url)) {
+    showError("Open an HTTPS career/apply page first.");
+    return;
+  }
+  const args = { url };
+  if (detectedJob && lastAnalyzeJobId) args.job_id = lastAnalyzeJobId;
+  try {
+    const data = await bridgeCall("enqueue_apply", args);
+    const qid = data?.data?.id;
+    if (qid) els.queueId.value = String(qid);
+    els.result.hidden = false;
+    els.resultJson.textContent = JSON.stringify(data, null, 2);
+  } catch (e) {
+    showError(`Enqueue failed: ${e.message}`);
+  }
+}
+
+let lastAnalyzeJobId = null;
 
 async function copyJson() {
   clearError();
@@ -311,6 +430,7 @@ async function analyzeJob() {
     }
     els.result.hidden = false;
     els.resultJson.textContent = JSON.stringify(data, null, 2);
+    lastAnalyzeJobId = data?.data?.job_id ?? data?.data?.id ?? null;
   } catch (e) {
     showError(`Bridge call failed: ${e.message}`);
   }
@@ -319,6 +439,8 @@ async function analyzeJob() {
 // ── wire up ─────────────────────────────────────────────────
 els.capture.addEventListener("click", captureFields);
 els.send.addEventListener("click", sendToBridge);
+els.autoApplyBtn.addEventListener("click", runAutoApplyInTab);
+els.enqueueBtn.addEventListener("click", enqueueCurrentPage);
 els.copy.addEventListener("click", copyJson);
 els.importBtn.addEventListener("click", importJob);
 els.analyzeBtn.addEventListener("click", analyzeJob);

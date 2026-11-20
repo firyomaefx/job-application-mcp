@@ -183,8 +183,8 @@ Set environment variable `JOB_MCP_ALL_TOOLS=1` before starting the server or HTT
 
 These limits are **on purpose** — not bugs:
 
-- ❌ **No auto-submit.** You click Apply on the employer’s site.
-- ❌ **No LinkedIn / Indeed bots.** Paste the description; fill forms yourself (their ToS forbid automation).
+- ❌ **No auto-submit by default.** You click Apply unless you opt in (below).
+- ❌ **No LinkedIn / Indeed auto-apply.** Import/analyze only; ATS career sites for automation.
 - ❌ **No CAPTCHA / 2FA hacking.** You handle security steps.
 - ❌ **No fake facts on the default path.** The two-paste card only names skills found in *your* CV text.
 
@@ -222,7 +222,8 @@ If you skipped the CV step, you only see: `No CV saved. Paste your CV first.`
 | 🧩 **Full MCP tool set** | Profile, CV files, job inbox, applications, reminders, backups, … |
 | 📄 **CV parsing** | PDF / DOCX / TXT from allowed folders |
 | ✍️ **Drafts** | Cover letter & answers (heuristic, or your own AI key) |
-| 📝 **Autofill preview** | Map profile fields — **preview only** |
+| 📝 **Autofill preview** | Map profile fields — **preview only** (default) |
+| 🤖 **Auto-apply (opt-in)** | `JOB_MCP_AUTO_APPLY=1` + extension — fill/submit on ATS with caps |
 | 📊 **Tracking** | Local application status pipeline |
 
 ### Companion apps
@@ -246,7 +247,14 @@ Captures form fields and asks the bridge for an **autofill preview**. Never subm
 
 Electron UI + bundled bridge (`JOB_MCP_ALL_TOOLS=1`). See [`desktop/README.md`](./desktop/README.md).
 
-> Both companions talk only to `127.0.0.1` and never submit applications for you.
+> Both companions talk only to `127.0.0.1`. With **`JOB_MCP_AUTO_APPLY=1`** on the bridge, the extension may fill and submit on allowed ATS pages after approval.
+
+### Auto-apply (opt-in)
+
+1. Start the bridge with `JOB_MCP_AUTO_APPLY=1` (and `JOB_MCP_ALL_TOOLS=1` for the extension).
+2. Call `set_apply_defaults` for salary, work authorization, and daily caps.
+3. `enqueue_apply` → `prepare_application` → open the apply URL → capture fields → **execute_autofill** → **Auto-apply** in the extension.
+4. LinkedIn/Indeed apply URLs are **rejected**; CAPTCHA/login pauses for you.
 
 ### How matching works (default card)
 

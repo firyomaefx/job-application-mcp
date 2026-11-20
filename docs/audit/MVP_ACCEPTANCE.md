@@ -26,7 +26,7 @@ fully local, and every MVP-excluded capability is **absent**.
 | Excluded capability | Method | Result |
 |---------------------|--------|--------|
 | CAPTCHA bypass | grep for captcha/solver/token-bypass | ✅ absent |
-| Unrestricted automatic submission | read `autofill_form`; grep for submit | ✅ absent — preview only |
+| Unrestricted automatic submission | read `autofill_form`; grep for submit | ✅ default preview only; auto-submit only when `JOB_MCP_AUTO_APPLY=1` + approval token + ATS URL guard |
 | Unlimited Claude usage | own-key use = user's own quota; Pro path debits | ✅ — no unlimited path (H2) |
 | Full LinkedIn automation | grep linkedin + automation | ✅ absent (analysis-and-manual only) |
 | Full Indeed automation | grep indeed + automation | ✅ absent |
@@ -39,8 +39,8 @@ fully local, and every MVP-excluded capability is **absent**.
 - `autofill_form` returns a structured preview of mapped fields; it performs
   **no** DOM submission, no `form.submit()`, no click on a submit button.
 - Tool descriptions explicitly state submission is user-approved only.
-- Chrome extension popup shows a preview and requires the user to act; it
-  does not auto-submit.
+- Chrome extension popup shows a preview by default; with `JOB_MCP_AUTO_APPLY=1`
+  it may auto-fill/submit on allowed ATS URLs after `execute_autofill` issues a token.
 - **Cycle 2 (N5):** submission *recording* is now gated end-to-end.
   `request_approval` runs a validation gate (valid app id · approved CV · not
   already submitted · no duplicate for the same job · no unresolved sensitive

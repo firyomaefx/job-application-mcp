@@ -29,8 +29,14 @@ USP: a local-first, model-neutral career agent with evidence-locked generation, 
 
 ### Rejected or deferred
 
-- Mass auto-apply, CAPTCHA bypass, stealth browsing, and automatic messaging.
-- LinkedIn scraping/automation; LinkedIn explicitly prohibits scraping and automated activity by third-party extensions.
+- CAPTCHA bypass, stealth browsing, and automatic messaging.
+- LinkedIn/Indeed **auto-submit** (import/manual only). Mass unattended apply without caps.
+
+### Opt-in (local module)
+
+- **Auto-apply on employer ATS** when `JOB_MCP_AUTO_APPLY=1`: queue, prepare,
+  extension fill/submit with approval tokens, daily caps, pre-stored answers
+  for sensitive fields.
 - Hosted sync, automated payment, and coach tenancy until isolation, PDPA, and paid-pilot gates pass.
 - Graph database; relational node/edge tables are sufficient for the first measured slice.
 
