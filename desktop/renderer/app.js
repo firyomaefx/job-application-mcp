@@ -58,6 +58,13 @@ const els = {
 let campaignCvId = null;
 let campaignJobUrls = [];
 
+function extractContactFromCvText(text) {
+  if (!text) return {};
+  const email = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)?.[0];
+  const phone = text.match(/(?:\+?\d[\d\s().-]{7,}\d)/)?.[0]?.trim();
+  return { email, phone };
+}
+
 function campaignAppendLog(line) {
   if (!line) return;
   els.campaignLog.textContent = (els.campaignLog.textContent ? `${els.campaignLog.textContent}\n` : "") + line;
@@ -81,7 +88,19 @@ async function campaignImportCv() {
   campaignCvId = parsed?.data?.cv_id ?? null;
   els.campaignCvLabel.textContent = campaignCvId
     ? `CV #${campaignCvId} · ${pick.file_path.split(/[/\\]/).pop()}`
-  : "Import failed";
+    : "Import failed";
+  if (campaignCvId) {
+    const contact = extractContactFromCvText(parsed?.data?.preview || "");
+    const patch = {};
+    if (contact.email) patch.email = contact.email;
+    if (contact.phone) patch.phone = contact.phone;
+    const skills = parsed?.data?.detected_skills;
+    if (Array.isArray(skills) && skills.length) patch.skills = skills.slice(0, 25);
+    if (Object.keys(patch).length) {
+      await call("update_profile", patch);
+      campaignAppendLog("Profile updated from résumé (email/phone/skills when found).");
+    }
+  }
   await refresh();
 }
 

@@ -7,7 +7,9 @@ One local workflow: **résumé → job target → Start**. No MCP tool names req
 - Built bridge: `npm run build && npm run bundle:bridge` (repo root).
 - Desktop: `cd desktop && npm install && npm start`.
 - Opt-in auto-apply on the bridge (the desktop app sets this automatically).
-- For unattended file upload + queue processing: `cd desktop && npm install playwright && npx playwright install chromium`.
+- For unattended file upload + queue processing:
+  `cd desktop && npm install playwright && npm run playwright:install`
+  (Chromium browsers are **not** bundled in the installer — run once per machine.)
 
 ## Steps
 

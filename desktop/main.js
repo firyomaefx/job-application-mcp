@@ -10,7 +10,18 @@
 // from the repo root, after `npm run build`). Packaged: electron-builder
 // ships it as an extraResource under process.resourcesPath.
 
-const { app, BrowserWindow, ipcMain, shell, nativeTheme, Tray, Menu, nativeImage, utilityProcess } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  ipcMain,
+  shell,
+  nativeTheme,
+  Tray,
+  Menu,
+  nativeImage,
+  utilityProcess,
+  Notification,
+} = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
 const http = require("node:http");
@@ -372,6 +383,16 @@ const { dialog } = require("electron");
 
 function sendCampaignLog(line) {
   if (win && !win.isDestroyed()) win.webContents.send("campaign:log", { line });
+  if (/paused|CAPTCHA|login|verification/i.test(line || "") && Notification.isSupported()) {
+    try {
+      new Notification({
+        title: "Job Application MCP",
+        body: String(line).slice(0, 240),
+      }).show();
+    } catch {
+      /* non-fatal */
+    }
+  }
 }
 
 function stopCampaignWorker() {

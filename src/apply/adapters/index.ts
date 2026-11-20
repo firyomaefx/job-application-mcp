@@ -10,6 +10,12 @@ const REGISTRY: Record<string, AdapterHints> = {
       "button.application-submit",
     ],
     apply_link_selectors: ["a#apply_button", 'a[href*="applications/new"]'],
+    file_input_selectors: [
+      'input[type="file"]#resume',
+      'input[type="file"][name*="resume"]',
+      'input[type="file"]',
+    ],
+    next_selectors: ["input.next", "button.next", 'a[rel="next"]'],
     notes: ["Greenhouse embed; multi-page may require manual navigation."],
   },
   lever: {
@@ -20,6 +26,11 @@ const REGISTRY: Record<string, AdapterHints> = {
       'input[type="submit"]',
     ],
     apply_link_selectors: ['a.postings-btn', 'a[href*="/apply"]'],
+    file_input_selectors: [
+      'input[type="file"][name*="resume"]',
+      'input[type="file"]',
+    ],
+    next_selectors: ['button[data-qa="btn-next"]', "button.next"],
     notes: ["Lever posting apply flow."],
   },
   ashby: {
@@ -35,6 +46,12 @@ const REGISTRY: Record<string, AdapterHints> = {
   workday: {
     id: "workday",
     submit_selectors: ['button[type="submit"]', 'input[type="submit"]'],
+    file_input_selectors: ['input[type="file"][data-automation-id="file-upload"]', 'input[type="file"]'],
+    next_selectors: [
+      'button[data-automation-id="bottom-navigation-next-button"]',
+      'button[aria-label*="Next"]',
+      'button[data-automation-id*="next"]',
+    ],
     notes: ["Workday often multi-step; auto-apply may pause for manual steps."],
   },
   generic: {
