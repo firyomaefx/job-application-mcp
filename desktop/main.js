@@ -10,7 +10,18 @@
 // from the repo root, after `npm run build`). Packaged: electron-builder
 // ships it as an extraResource under process.resourcesPath.
 
-const { app, BrowserWindow, ipcMain, shell, nativeTheme, Tray, Menu, nativeImage, utilityProcess } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  ipcMain,
+  shell,
+  nativeTheme,
+  Tray,
+  Menu,
+  nativeImage,
+  utilityProcess,
+  Notification,
+} = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
 const http = require("node:http");
@@ -372,6 +383,16 @@ const { dialog } = require("electron");
 
 function sendCampaignLog(line) {
   if (win && !win.isDestroyed()) win.webContents.send("campaign:log", { line });
+  if (/paused|CAPTCHA|login|verification/i.test(line || "") && Notification.isSupported()) {
+    try {
+      new Notification({
+        title: "Job Application MCP",
+        body: String(line).slice(0, 240),
+      }).show();
+    } catch {
+      /* non-fatal */
+    }
+  }
 }
 
 function stopCampaignWorker() {
@@ -463,6 +484,15 @@ ipcMain.handle("campaign:stopWorker", () => {
   return { ok: true };
 });
 ipcMain.handle("campaign:workerRunning", () => ({ running: Boolean(campaignProc) }));
+
+ipcMain.handle("campaign:saveConfig", (_e, config) => {
+  const dir = dataDir();
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, "campaign-last.json");
+  const payload = { ...config, saved_at: new Date().toISOString() };
+  fs.writeFileSync(file, JSON.stringify(payload, null, 2), "utf8");
+  return { ok: true, path: file };
+});
 
 app.on("window-all-closed", () => {
   stopCampaignWorker();

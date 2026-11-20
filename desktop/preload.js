@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld("jobMcp", {
   startCampaignWorker: () => ipcRenderer.invoke("campaign:startWorker"),
   stopCampaignWorker: () => ipcRenderer.invoke("campaign:stopWorker"),
   campaignWorkerRunning: () => ipcRenderer.invoke("campaign:workerRunning"),
+  saveCampaignConfig: (config) => ipcRenderer.invoke("campaign:saveConfig", config),
   onCampaignLog: (cb) => {
     const handler = (_e, payload) => cb(payload);
     ipcRenderer.on("campaign:log", handler);

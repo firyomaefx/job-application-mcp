@@ -7,7 +7,9 @@ One local workflow: **résumé → job target → Start**. No MCP tool names req
 - Built bridge: `npm run build && npm run bundle:bridge` (repo root).
 - Desktop: `cd desktop && npm install && npm start`.
 - Opt-in auto-apply on the bridge (the desktop app sets this automatically).
-- For unattended file upload + queue processing: `cd desktop && npm install playwright && npx playwright install chromium`.
+- For unattended file upload + queue processing:
+  `cd desktop && npm install playwright && npm run playwright:install`
+  (Chromium browsers are **not** bundled in the installer — run once per machine.)
 
 ## Steps
 
@@ -15,10 +17,10 @@ One local workflow: **résumé → job target → Start**. No MCP tool names req
 2. **Job target**
    - **URLs:** one apply link per line (Greenhouse, Lever, company careers, etc.).
    - **Search:** title + location + boards → optional JobSpy import ([DISCOVERY.md](./DISCOVERY.md)).
-   - **Caps:** min match score, max applies/day → `set_apply_defaults`.
-3. **Start campaign** — calls `start_campaign`, enqueues and prepares the queue.
-4. **Start Playwright worker** — opens a persistent browser profile, fills forms, uploads CV,
-   pauses on CAPTCHA/login, and records submission when safe.
+   - **Caps:** min match score, max applies/day.
+   - **Screening answers:** work authorization, salary, notice period → `set_apply_defaults`.
+3. **Start campaign** — saves defaults, calls `start_campaign`, enqueues and prepares the queue, then starts the Playwright worker when items are ready.
+4. The worker opens a persistent browser profile, fills forms, uploads CV, pauses on CAPTCHA/login (desktop notification), and records submission when safe.
 
 ## What stays blocked
 

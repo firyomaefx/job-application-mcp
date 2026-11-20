@@ -245,16 +245,20 @@ Captures form fields and asks the bridge for an **autofill preview**. Never subm
 
 #### Desktop app — `desktop/`
 
-Electron UI + bundled bridge (`JOB_MCP_ALL_TOOLS=1`). See [`desktop/README.md`](./desktop/README.md).
+Electron UI + bundled bridge (`JOB_MCP_ALL_TOOLS=1` and **`JOB_MCP_AUTO_APPLY=1`**). **Primary one-button path:** résumé → job URLs or JobSpy search → **Start campaign** → optional Playwright worker. Guide: [`docs/AUTO_APPLY_CAMPAIGN.md`](./docs/AUTO_APPLY_CAMPAIGN.md). See [`desktop/README.md`](./desktop/README.md).
 
 > Both companions talk only to `127.0.0.1`. With **`JOB_MCP_AUTO_APPLY=1`** on the bridge, the extension may fill and submit on allowed ATS pages after approval.
 
 ### Auto-apply (opt-in)
 
+**Easiest:** desktop [**Auto-apply campaign**](./docs/AUTO_APPLY_CAMPAIGN.md) (no MCP tool names required).
+
+**Agent / extension flow:**
+
 1. Start the bridge with `JOB_MCP_AUTO_APPLY=1` (and `JOB_MCP_ALL_TOOLS=1` for the extension).
-2. Call `set_apply_defaults` for salary, work authorization, and daily caps.
-3. `enqueue_apply` → `prepare_application` → open the apply URL → capture fields → **execute_autofill** → **Auto-apply** in the extension.
-4. LinkedIn/Indeed apply URLs are **rejected**; CAPTCHA/login pauses for you.
+2. Call `set_apply_defaults` for salary, work authorization, and daily caps — or **`start_campaign`** with a URL list.
+3. `enqueue_apply` → `prepare_application` → open the apply URL → capture fields → **execute_autofill** → **Auto-apply** in the extension (or the desktop Playwright worker).
+4. LinkedIn/Indeed apply URLs are **rejected**; CAPTCHA/login pauses for you. Optional local discovery: [`docs/DISCOVERY.md`](./docs/DISCOVERY.md) (JobSpy, incl. JobStreet).
 
 ### How matching works (default card)
 

@@ -17,7 +17,8 @@ Use `JOBSPY_PYTHON=python` on Windows if `python3` is not on PATH.
 From the repo root:
 
 ```bash
-node scripts/jobspy-import.mjs '{"search_term":"data engineer","location":"Kuala Lumpur","results_wanted":20,"site_name":["indeed","jobstreet"]}'
+# Malaysia example (JobStreet + Indeed listings)
+node scripts/jobspy-import.mjs '{"search_term":"data engineer","location":"Kuala Lumpur","results_wanted":20,"site_name":["indeed","jobstreet"],"country_indeed":"malaysia"}'
 ```
 
 Output: JSON `{ ok, count, jobs: [{ title, company, url, description, location }] }`.

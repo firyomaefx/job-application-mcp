@@ -8,6 +8,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "playwright:install": "playwright install chromium",
     "icon": "node build-icon.js",
     "pack": "electron-builder --dir && npm run verify:package",
     "dist": "electron-builder && npm run verify:package",

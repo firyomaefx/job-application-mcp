@@ -49,6 +49,9 @@ const els = {
   campaignJobspyStatus: document.getElementById("campaign-jobspy-status"),
   campaignMinScore: document.getElementById("campaign-min-score"),
   campaignMaxDay: document.getElementById("campaign-max-day"),
+  campaignWorkAuth: document.getElementById("campaign-work-auth"),
+  campaignSalary: document.getElementById("campaign-salary"),
+  campaignNotice: document.getElementById("campaign-notice"),
   campaignStart: document.getElementById("campaign-start"),
   campaignWorkerStart: document.getElementById("campaign-worker-start"),
   campaignWorkerStop: document.getElementById("campaign-worker-stop"),
@@ -57,6 +60,13 @@ const els = {
 
 let campaignCvId = null;
 let campaignJobUrls = [];
+
+function extractContactFromCvText(text) {
+  if (!text) return {};
+  const email = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)?.[0];
+  const phone = text.match(/(?:\+?\d[\d\s().-]{7,}\d)/)?.[0]?.trim();
+  return { email, phone };
+}
 
 function campaignAppendLog(line) {
   if (!line) return;
@@ -73,6 +83,20 @@ function parseUrlLines(text) {
     .filter((l) => /^https?:\/\//i.test(l));
 }
 
+function renderCampaignDefaults(data) {
+  if (!data) return;
+  if (els.campaignMinScore && data.min_match_score != null) {
+    els.campaignMinScore.value = String(data.min_match_score);
+  }
+  if (els.campaignMaxDay && data.max_applies_per_day != null) {
+    els.campaignMaxDay.value = String(data.max_applies_per_day);
+  }
+  const a = data.answers || {};
+  if (els.campaignWorkAuth && a.work_authorization) els.campaignWorkAuth.value = a.work_authorization;
+  if (els.campaignSalary && a.salary_expectation) els.campaignSalary.value = a.salary_expectation;
+  if (els.campaignNotice && a.notice_period) els.campaignNotice.value = a.notice_period;
+}
+
 async function campaignImportCv() {
   setError("");
   const pick = await window.jobMcp.importCvFile();
@@ -81,7 +105,19 @@ async function campaignImportCv() {
   campaignCvId = parsed?.data?.cv_id ?? null;
   els.campaignCvLabel.textContent = campaignCvId
     ? `CV #${campaignCvId} · ${pick.file_path.split(/[/\\]/).pop()}`
-  : "Import failed";
+    : "Import failed";
+  if (campaignCvId) {
+    const contact = extractContactFromCvText(parsed?.data?.preview || "");
+    const patch = {};
+    if (contact.email) patch.email = contact.email;
+    if (contact.phone) patch.phone = contact.phone;
+    const skills = parsed?.data?.detected_skills;
+    if (Array.isArray(skills) && skills.length) patch.skills = skills.slice(0, 25);
+    if (Object.keys(patch).length) {
+      await call("update_profile", patch);
+      campaignAppendLog("Profile updated from résumé (email/phone/skills when found).");
+    }
+  }
   await refresh();
 }
 
@@ -140,7 +176,30 @@ async function campaignStart() {
   }
   const min = Number(els.campaignMinScore.value);
   const max = Number(els.campaignMaxDay.value);
+  const answers = {};
+  const wa = els.campaignWorkAuth?.value.trim();
+  const sal = els.campaignSalary?.value.trim();
+  const notice = els.campaignNotice?.value.trim();
+  if (wa) answers.work_authorization = wa;
+  if (sal) answers.salary_expectation = sal;
+  if (notice) answers.notice_period = notice;
+  if (Object.keys(answers).length) {
+    await call("set_apply_defaults", {
+      answers,
+      min_match_score: Number.isFinite(min) ? min : 0,
+      max_applies_per_day: Number.isFinite(max) ? max : 10,
+    });
+    campaignAppendLog("Apply defaults saved.");
+  }
   campaignAppendLog(`Starting campaign (${urls.length} URL(s))…`);
+  await window.jobMcp.saveCampaignConfig?.({
+    urls,
+    cv_id: campaignCvId,
+    min_match_score: Number.isFinite(min) ? min : 0,
+    max_applies_per_day: Number.isFinite(max) ? max : 10,
+    search_title: els.campaignSearchTitle.value.trim() || null,
+    search_location: els.campaignSearchLoc.value.trim() || null,
+  });
   const res = await call("start_campaign", {
     urls,
     cv_id: campaignCvId,
@@ -154,6 +213,9 @@ async function campaignStart() {
     }
   }
   await refresh();
+  if ((res.data?.ready_count ?? 0) > 0) {
+    await campaignWorkerStart();
+  }
 }
 
 async function campaignWorkerStart() {
@@ -236,6 +298,9 @@ async function refresh() {
     renderReminders(dueRes.data);
     if (detectRes?.data) renderChecklist(detectRes.data);
     if (settingsRes?.data) renderSettingsForm(settingsRes.data);
+    call("get_apply_defaults", {})
+      .then((d) => renderCampaignDefaults(d.data))
+      .catch(() => {});
   } catch (e) {
     setError(`Could not reach bridge: ${e.message}. Click "Restart bridge" or run "npm run serve:http".`);
     clearEl(els.profile, "span", "—", "muted");

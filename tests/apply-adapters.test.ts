@@ -8,4 +8,7 @@ test("adapter registry includes greenhouse and generic", () => {
   assert.ok(ids.includes("generic"));
   const g = getAdapterHints("greenhouse");
   assert.ok(g.submit_selectors.length > 0);
+  assert.ok(g.file_input_selectors && g.file_input_selectors.length > 0);
+  const w = getAdapterHints("workday");
+  assert.ok(w.next_selectors && w.next_selectors.length > 0);
 });

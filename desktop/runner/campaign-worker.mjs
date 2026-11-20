@@ -132,6 +132,56 @@ function applyMappingInPage(payload) {
   return { ok: true, filled, submitted };
 }
 
+async function clickApplyLink(page, adapter) {
+  if (!adapter?.apply_link_selectors?.length) return;
+  const clicked = await page.evaluate((sels) => {
+    for (const sel of sels) {
+      const el = document.querySelector(sel);
+      if (el && el instanceof HTMLElement) {
+        el.click();
+        return true;
+      }
+    }
+    return false;
+  }, adapter.apply_link_selectors);
+  if (clicked) await page.waitForTimeout(1200);
+}
+
+async function uploadCvOnPage(page, adapter, cvPath) {
+  const selectors = adapter?.file_input_selectors?.length
+    ? adapter.file_input_selectors
+    : ['input[type="file"]'];
+  for (const sel of selectors) {
+    const loc = page.locator(sel).first();
+    try {
+      if ((await loc.count()) > 0) {
+        await loc.setInputFiles(cvPath);
+        return true;
+      }
+    } catch {
+      /* try next selector */
+    }
+  }
+  return false;
+}
+
+async function clickNextStep(page, adapter) {
+  if (!adapter?.next_selectors?.length) return false;
+  return page.evaluate((sels) => {
+    for (const sel of sels) {
+      const el = document.querySelector(sel);
+      if (el && el instanceof HTMLElement && !el.disabled) {
+        const tag = el.tagName.toLowerCase();
+        const type = (el.getAttribute("type") || "").toLowerCase();
+        if (type === "submit") continue;
+        el.click();
+        return true;
+      }
+    }
+    return false;
+  }, adapter.next_selectors);
+}
+
 async function cvFileForApplication(applicationId) {
   const apps = await bridgeCall("list_applications", {});
   const app = (apps.data || []).find((a) => a.id === applicationId);
@@ -152,6 +202,7 @@ async function processQueueItem(queueId, context) {
   try {
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 120_000 });
     await page.waitForTimeout(1500);
+    await clickApplyLink(page, adapter);
 
     const form_fields = await page.evaluate(captureFieldsInPage);
     const exec = await bridgeCall("execute_autofill", {
@@ -181,15 +232,32 @@ async function processQueueItem(queueId, context) {
 
     const cvPath = await cvFileForApplication(application_id);
     if (cvPath) {
-      const files = await page.locator('input[type="file"]').all();
-      for (const input of files) {
-        try {
-          await input.setInputFiles(cvPath);
-          log(`Uploaded CV for queue #${queueId}`);
-        } catch {
-          /* optional field */
-        }
-      }
+      const ok = await uploadCvOnPage(page, adapter, cvPath);
+      if (ok) log(`Uploaded CV for queue #${queueId}`);
+    }
+
+    for (let step = 0; step < 3; step += 1) {
+      const advanced = await clickNextStep(page, adapter);
+      if (!advanced) break;
+      await page.waitForTimeout(1500);
+      const moreFields = await page.evaluate(captureFieldsInPage);
+      if (!moreFields.length) continue;
+      const more = await bridgeCall("execute_autofill", {
+        application_id,
+        queue_id: queueId,
+        url: page.url(),
+        form_fields: moreFields,
+        issue_approval_token: false,
+      });
+      await page.evaluate(applyMappingInPage, {
+        mapping: (more.data?.mapping || []).map((m) => ({
+          field: m.field,
+          value: m.value,
+          requires_user_review: m.requires_user_review,
+        })),
+        submit: false,
+        adapter,
+      });
     }
 
     await bridgeCall("report_apply_step", { queue_id: queueId, step: "filled" });
