@@ -75,6 +75,40 @@
       </details>
     </section>
 
+    <section class="card campaign-card" id="campaign">
+      <h2>Auto-apply campaign</h2>
+      <p class="muted">Upload a résumé, set targets, then Start. Uses local Playwright + ATS adapters (no LinkedIn apply).</p>
+      <div class="row">
+        <button type="button" id="campaign-pick-cv" class="primary">Choose résumé…</button>
+        <span id="campaign-cv-label" class="muted">No CV imported yet</span>
+      </div>
+      <details open>
+        <summary>Job targets</summary>
+        <label class="stack-label">Apply URLs (one per line)
+          <textarea id="campaign-urls" rows="4" placeholder="https://boards.greenhouse.io/…"></textarea>
+        </label>
+        <div class="row">
+          <label>Search title <input id="campaign-search-title" type="text" placeholder="software engineer" /></label>
+          <label>Location <input id="campaign-search-loc" type="text" placeholder="Kuala Lumpur" /></label>
+        </div>
+        <button type="button" id="campaign-jobspy">Search boards (JobSpy)</button>
+        <p id="campaign-jobspy-status" class="muted"></p>
+        <p class="muted" style="font-size:11px;margin-top:6px">
+          Optional: <code>pip install python-jobspy pandas</code> — see docs/DISCOVERY.md
+        </p>
+        <div class="row" style="margin-top:10px">
+          <label>Min match <input id="campaign-min-score" type="number" min="0" max="100" value="0" style="width:64px" /></label>
+          <label>Max/day <input id="campaign-max-day" type="number" min="1" max="100" value="10" style="width:64px" /></label>
+        </div>
+      </details>
+      <div class="row" style="margin-top:12px">
+        <button type="button" id="campaign-start" class="primary big">Start campaign</button>
+        <button type="button" id="campaign-worker-start">Start Playwright worker</button>
+        <button type="button" id="campaign-worker-stop">Stop worker</button>
+      </div>
+      <pre id="campaign-log" class="campaign-log muted" aria-live="polite"></pre>
+    </section>
+
     <section class="card">
       <h2>Profile</h2>
       <div id="profile" class="profile"><span class="muted">No profile yet.</span></div>
@@ -112,7 +146,7 @@
 
     <footer>
       <span class="muted" id="bridge-url"></span>
-      <span class="muted">Submission stays manual — this UI only reads local data.</span>
+      <span class="muted">Auto-apply is opt-in via Campaign; data stays local.</span>
     </footer>
 
     <script src="app.js"></script>

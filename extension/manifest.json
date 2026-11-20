@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Job Application MCP — Form Capture & Job Import",
-  "version": "0.4.2",
-  "description": "Capture form fields and one-click import job postings on a career page into your local Job Application MCP profile. Nothing is submitted.",
+  "version": "0.4.3",
+  "description": "Import jobs and preview autofill via local MCP. Optional auto-apply on employer ATS when JOB_MCP_AUTO_APPLY=1.",
   "permissions": ["activeTab", "scripting", "storage"],
   "host_permissions": [
     "http://127.0.0.1/*",
@@ -17,7 +17,9 @@
     "https://*.bamboohr.com/*",
     "https://*.jobvite.com/*",
     "https://*.taleo.net/*",
-    "https://*.myworkdayjobs.com/*"
+    "https://*.myworkdayjobs.com/*",
+    "https://*.ashbyhq.com/*",
+    "https://jobs.ashbyhq.com/*"
   ],
   "action": {
     "default_title": "Job Application MCP",
@@ -46,8 +48,10 @@
         "https://*.smartrecruiters.com/*",
         "https://*.bamboohr.com/*",
         "https://*.jobvite.com/*",
-        "https://*.taleo.net/*"
-      ],
+    "https://*.taleo.net/*",
+    "https://*.ashbyhq.com/*",
+    "https://jobs.ashbyhq.com/*"
+  ],
       "js": ["content/extract.js", "content/import-detector.js"],
       "run_at": "document_idle"
     }

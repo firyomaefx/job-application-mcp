@@ -8,7 +8,7 @@
   <body>
     <header>
       <h1>Job Application MCP</h1>
-      <p class="tag">Form capture · preview only · nothing is submitted</p>
+      <p class="tag" id="tagline">Form capture · preview only · nothing is submitted</p>
     </header>
 
     <section id="status" class="status" hidden>
@@ -40,8 +40,14 @@
         <label for="application-id">Application ID</label>
         <input id="application-id" type="number" min="1" placeholder="e.g. 1" />
       </div>
+      <div class="row" id="queue-id-row" hidden>
+        <label for="queue-id">Queue ID (optional)</label>
+        <input id="queue-id" type="number" min="1" placeholder="for daily cap tracking" />
+      </div>
 
       <button id="send" class="primary">Preview autofill via MCP</button>
+      <button id="auto-apply" class="primary" hidden>Auto-apply (fill + submit)</button>
+      <button id="enqueue" class="ghost" hidden>Enqueue this page for auto-apply</button>
       <button id="copy" class="ghost">Copy JSON</button>
     </section>
 
@@ -54,7 +60,7 @@
 
     <footer>
       <a id="options-link" href="#">Bridge settings</a>
-      <span class="hint">No fields are ever submitted automatically.</span>
+      <span class="hint" id="footer-hint">No fields are ever submitted automatically unless auto-apply mode is enabled on your bridge.</span>
     </footer>
 
     <script src="popup.js" type="module"></script>

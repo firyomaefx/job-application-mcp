@@ -17,6 +17,9 @@
   "dependencies": {
     "electron-updater": "6.8.9"
   },
+  "optionalDependencies": {
+    "playwright": "1.58.2"
+  },
   "devDependencies": {
     "@electron/asar": "3.4.1",
     "acorn": "8.18.0",
@@ -27,7 +30,7 @@
   "build": {
     "appId": "io.github.jobapplicationmcp.desktop",
     "productName": "Job Application MCP",
-    "files": ["main.js", "preload.js", "version-util.js", "renderer/**/*"],
+    "files": ["main.js", "preload.js", "version-util.js", "renderer/**/*", "runner/**/*"],
     "extraResources": [
       { "from": "bridge-bundle.mjs", "to": "bridge-bundle.mjs" }
     ],

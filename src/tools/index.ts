@@ -18,6 +18,20 @@ import {
   deleteReminderTool,
 } from "./reminders.js";
 import { requestApprovalTool, confirmSubmissionTool } from "./submission.js";
+import {
+  setApplyDefaultsTool,
+  getApplyDefaultsTool,
+  enqueueApplyTool,
+  listApplyQueueTool,
+  cancelApplyQueueTool,
+  prepareApplicationTool,
+  runAutoApplyTool,
+  executeAutofillTool,
+  reportApplyStepTool,
+  pauseForHumanTool,
+  confirmApplyAttemptTool,
+  startCampaignTool,
+} from "./auto-apply.js";
 import { analyticsTool, statusTool } from "./analytics.js";
 import { systemCheckTool } from "./system_check.js";
 import { backupDataTool, listBackupsTool, restoreDataTool } from "./backup.js";
@@ -57,6 +71,19 @@ export const tools: AnyTool[] = [
   autofillFormTool,
   requestApprovalTool,
   confirmSubmissionTool,
+  // auto-apply (opt-in: JOB_MCP_AUTO_APPLY=1)
+  setApplyDefaultsTool,
+  getApplyDefaultsTool,
+  enqueueApplyTool,
+  listApplyQueueTool,
+  cancelApplyQueueTool,
+  prepareApplicationTool,
+  runAutoApplyTool,
+  executeAutofillTool,
+  reportApplyStepTool,
+  pauseForHumanTool,
+  confirmApplyAttemptTool,
+  startCampaignTool,
   // pipeline: reminders (Phase 3)
   addReminderTool,
   listRemindersTool,

@@ -10,6 +10,8 @@ import {
   updateApplicationStatus,
 } from "../store/applications.js";
 import { classifyField } from "../forms/fields.js";
+import { classifyFieldsForApply } from "../apply/mapping.js";
+import { buildCandidateValues } from "../apply/candidate-values.js";
 import type { ApplicationStatus } from "../lib/types.js";
 
 const saveApplicationSchema = z.object({
@@ -156,20 +158,15 @@ export const autofillFormTool: ToolDef<typeof autofillFormSchema> = {
   run: (input) => {
     const app = getApplication(input.application_id);
     if (!app) return { summary: `Application ${input.application_id} not found.` };
-    const profile = getDefaultProfile();
     const job = getJob(app.job_id);
 
-    const candidateValues: Record<string, string> = {
-      full_name: profile.full_name,
-      email: profile.email ?? "",
-      phone: profile.phone ?? "",
-      location: profile.location ?? "",
-      headline: profile.headline ?? "",
-      cover_letter: app.cover_letter ?? "",
-    };
+    const candidateValues = { ...buildCandidateValues(app) };
 
     const fields = input.form_fields ?? defaultFormFields();
-    const mapping = fields.map((f) => classifyField(f, candidateValues));
+    const mapping =
+      process.env.JOB_MCP_AUTO_APPLY === "1"
+        ? classifyFieldsForApply(fields, candidateValues)
+        : fields.map((f) => classifyField(f, candidateValues));
 
     return {
       summary: `Previewed autofill for ${mapping.length} field(s) — application ${app.id}${

@@ -17,9 +17,10 @@ Language: **TypeScript/Node (ESM, Node ≥ 22)**. Local DB: **`node:sqlite`**
   Exports `allowedOrigin` (CORS allow-list). Starts the listener only when run
   as the entry point, not on import.
 - `src/server.ts` — server factory + tool registry.
-- `src/tools/` — one file per MCP tool (23 total). Files: `profile`, `cv`,
+- `src/tools/` — one file per MCP tool. Files: `profile`, `cv`,
   `job`, `matching` (match/tailor/cover_letter/draft_answer), `application`
-  (save/list/update/autofill), `analytics` (analytics/status), `pro`
+  (save/list/update/autofill), `auto-apply` (queue/execute when enabled),
+  `analytics` (analytics/status), `pro`
   (credits/topup/grant), `admin` (business). `matching` exports `resolveProvider`.
 - `src/store/` — SQLite layer (`db.ts` opens/migrates; `profile.ts`,
   `applications.ts` are CRUD). `node:sqlite` DatabaseSync.
@@ -59,10 +60,11 @@ Language: **TypeScript/Node (ESM, Node ≥ 22)**. Local DB: **`node:sqlite`**
   now, could call an AI service later).
 - Privacy: CVs and applications live under `JOB_MCP_DATA_DIR` (default
   `./data`), gitignored. Never log full CV text or PII at info level.
-- Submission is **user-approved only** — `autofill_form` returns a
-  preview; it never submits. Reflect this in tool descriptions.
-- Do not automate LinkedIn/Indeed submission (ToS). Those platforms are
-  analysis-and-manual-completion only.
+- Submission is **user-approved by default** — `autofill_form` returns a
+  preview; it does not touch the browser unless `JOB_MCP_AUTO_APPLY=1`.
+- Opt-in auto-apply (`src/apply/`, `execute_autofill`, Chrome
+  `content/apply-runner.js`) may fill/submit on **employer ATS URLs only**.
+  Never auto-submit on LinkedIn/Indeed (ToS). No CAPTCHA bypass.
 
 ## Commands
 
@@ -72,6 +74,7 @@ Language: **TypeScript/Node (ESM, Node ≥ 22)**. Local DB: **`node:sqlite`**
 - `npm run typecheck` — `tsc --noEmit`
 - `node dist/src/index.js` — start the stdio MCP server
 - `npm run serve:http` — start the local HTTP bridge (127.0.0.1:8787)
+- `JOB_MCP_AUTO_APPLY=1` — enable auto-apply MCP tools + extension submit
 - `cd extension && node build-icons.js` — regenerate extension icons
 - `cd desktop && npm start` — launch the Electron desktop app
 

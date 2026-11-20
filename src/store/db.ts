@@ -214,12 +214,39 @@ function migrate(db: DatabaseSync): void {
   db.exec("CREATE INDEX IF NOT EXISTS idx_cvs_parent ON cvs(profile_id, parent_cv_id)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_cvs_active ON cvs(profile_id, is_active)");
 
+  // ── schema v7: auto-apply queue + defaults (opt-in module) ─────────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS apply_defaults (
+      profile_id             INTEGER PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+      answers                TEXT NOT NULL DEFAULT '{}',
+      min_match_score        INTEGER NOT NULL DEFAULT 0,
+      max_applies_per_day    INTEGER NOT NULL DEFAULT 10,
+      auto_enqueue_on_detect INTEGER NOT NULL DEFAULT 0,
+      updated_at             TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS apply_queue (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      profile_id     INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+      job_id         INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+      url            TEXT NOT NULL,
+      status         TEXT NOT NULL DEFAULT 'pending',
+      application_id INTEGER REFERENCES applications(id) ON DELETE SET NULL,
+      error          TEXT,
+      pause_reason   TEXT,
+      adapter_id     TEXT,
+      created_at     TEXT NOT NULL,
+      updated_at     TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_apply_queue_profile ON apply_queue(profile_id, status);
+  `);
+
   const row = db.prepare("SELECT value FROM meta WHERE key = ?").get("schema_version") as
     | { value: string }
     | undefined;
   const current = row ? Number(row.value) : 0;
-  if (current < 6) {
-    db.prepare("INSERT OR REPLACE INTO meta(key, value) VALUES (?, '6')").run("schema_version");
+  if (current < 7) {
+    db.prepare("INSERT OR REPLACE INTO meta(key, value) VALUES (?, '7')").run("schema_version");
   }
 }
 
@@ -251,6 +278,8 @@ export function resetDb(): void {
     DELETE FROM accounts;
     DELETE FROM credit_ledger;
     DELETE FROM credit_balance;
+    DELETE FROM apply_queue;
+    DELETE FROM apply_defaults;
     DELETE FROM applications;
     DELETE FROM jobs;
     DELETE FROM cvs;

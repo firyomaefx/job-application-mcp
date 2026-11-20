@@ -157,6 +157,29 @@ summary { cursor: pointer; color: var(--muted); font-size: 12px; }
   border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px;
 }
 .ai-form-actions { display: flex; gap: 8px; }
+.campaign-card textarea {
+  width: 100%;
+  font: inherit;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-top: 4px;
+  resize: vertical;
+}
+.stack-label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0; }
+.campaign-log {
+  margin-top: 12px;
+  max-height: 160px;
+  overflow: auto;
+  font-size: 11px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  white-space: pre-wrap;
+}
 footer {
   margin-top: 16px;
   display: flex; justify-content: space-between;

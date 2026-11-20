@@ -25,6 +25,18 @@ GitHub counts are a dated snapshot and will drift.
 | AIHawk | Automated tailored job application bot | 30,155 stars; AGPL; active 2026-08-04 | Demonstrates automation demand; mass auto-apply conflicts with this product’s trust boundary | [repository](https://github.com/feder-cr/Jobs_Applier_AI_Agent_AIHawk) |
 | Adzuna Job Search MCP | MCP search/salary/employer lookup | 14 stars; MIT; updated 2026-08-05 | Useful import/search adapter; does not provide verified career evidence continuity | [repository](https://github.com/folathecoder/adzuna-job-search-mcp) |
 
+### Browser auto-apply references (borrowed patterns — not forks)
+
+| Project | Stars (snapshot) | Local / Win·mac | Auto-apply | What we borrow |
+|---|---|---:|---|---|
+| [AIHawk / Jobs_Applier_AI_Agent](https://github.com/feder-cr/Jobs_Applier_AI_Agent) | ~32k | Python + Playwright; runs on your PC | Full (incl. LinkedIn) | Campaign loop, answer bank, logging — **not** LinkedIn automation in core |
+| [JobSpy](https://github.com/speedyapply/JobSpy) | ~4.8k | Python library; local | Discovery only | Optional sidecar → `analyze_job` / `enqueue_apply` (JobStreet, Indeed, …) |
+| [linkedin-autoapply](https://github.com/mohammed-fahim-cse/linkedin-autoapply) | small | Electron + Playwright | Semi-auto | Desktop + persistent browser profile for uploads |
+| [applypilot](https://github.com/sahil-shaik-007/applypilot) | small | Windows Electron | Campaign parallel apply | One-screen “search + apply” product shape |
+| [YACareerOps / job_search_agent](https://github.com/Cask-Hound-Digital/job_search_agent) | small | Local HTTP daemon | Prep + search | Local daemon + résumé package before apply |
+
+**This repo’s integration:** [desktop/README.md](../desktop/README.md) Campaign wizard + optional Playwright worker ([`desktop/runner/campaign-worker.mjs`](../desktop/runner/campaign-worker.mjs)); optional [`scripts/jobspy-import.mjs`](../scripts/jobspy-import.mjs). ATS-only apply guard in [`src/apply/platform.ts`](../src/apply/platform.ts).
+
 ## Malaysia alternatives and manual services
 
 | Alternative | Current offer | Gap this product can address | Evidence |
