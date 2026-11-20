@@ -82,6 +82,8 @@ function startBridge() {
       JOB_MCP_DATA_DIR: DATA_DIR,
       JOB_MCP_HTTP_PORT: String(BRIDGE_PORT),
       JOB_MCP_HTTP_TOKEN: BRIDGE_TOKEN,
+      // The chat default is two paste tools. The desktop app uses the full list.
+      JOB_MCP_ALL_TOOLS: "1",
     },
     stdio: "pipe",
     serviceName: "Job Application MCP Bridge",

@@ -25,6 +25,7 @@ Analyse jobs · Match against your CV · Tailor documents · Preview forms · Tr
 - [How it works](#how-it-works)
 - [Quick start](#quick-start)
 - [Connect an MCP client](#connect-an-mcp-client)
+- [Everyday use](#everyday-use)
 - [Tools reference](#tools-reference)
 - [A full example flow](#a-full-example-flow)
 - [Configuration](#configuration)
@@ -157,19 +158,33 @@ Build the project, then add the server to your MCP client's config.
 node dist/cli/cli.js serve      # equivalent to: node dist/src/index.js
 ```
 
-The server speaks JSON-RPC over stdio. See
-[A full example flow](#a-full-example-flow) for raw request examples.
+The server speaks JSON-RPC over stdio. A chat client sees two tools. See
+[Everyday use](#everyday-use).
+
+---
+
+## Everyday use
+
+Paste your CV, then paste a job. The server scores it locally and returns a short card. It does not invent a job title, an employer, or skills that are not in your CV.
+
+In a chat client the tools are `save_my_cv` (`text`) and `check_this_job` (`description`). Show the returned text as-is.
+
+From the terminal, with no chat model:
+
+```bash
+job-mcp cv cv.txt
+job-mcp job job.txt
+```
+
+If no CV is saved, `check_this_job` stops with `No CV saved. Paste your CV first.` and stores nothing.
+
+Set `JOB_MCP_ALL_TOOLS=1` to expose the full tool list below (profile, matching, reminders, admin, and the rest). The desktop app sets this for itself. The default chat config does not.
 
 ---
 
 ## Tools reference
 
-All 23 tools are local and synchronous-ish (CV parsing and AI calls are async).
-Arguments are validated with zod; the MCP client receives a JSON Schema for each.
-The **13 free-core tools** (profile → autofill) are the everyday workflow. The
-**credits/Pro** and **admin/business** tools are wire-ready seams for the hosted
-Pro service (see [Business model](#business-model)); they run locally today and
-do not require any subscription.
+The tools below are the full list, available when `JOB_MCP_ALL_TOOLS=1`. They are local and synchronous-ish (CV parsing and AI calls are async). Arguments are validated with zod; the MCP client receives a JSON Schema for each. The **credits/Pro** and **admin/business** tools are wire-ready seams for the hosted Pro service (see [Business model](#business-model)); they run locally today and do not require any subscription.
 
 ### Profile
 
@@ -251,41 +266,21 @@ so an MCP client can't read arbitrary files.
 
 ## A full example flow
 
-Here's a complete session using the stdio JSON-RPC interface directly. (An MCP
-client like Claude does this for you in natural language.)
+Connect the server, paste a CV, paste a job, read the card.
 
 ```bash
-node dist/src/index.js
+node dist/cli/cli.js cv cv.txt
+node dist/cli/cli.js job job.txt
 ```
 
-Send these lines (one JSON-RPC object per line):
+`cv.txt` is your CV. `job.txt` is the posting. The second command prints the score, the skills in both texts, the skills only in the job, and a five-line note that names only the matched skills. The role line stays `Untitled role`.
+
+The same two steps over MCP:
 
 ```jsonc
-// 1. handshake
-{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"demo","version":"0"}}}
-{"jsonrpc":"2.0","method":"notifications/initialized"}
-
-// 2. set up your profile
-{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"update_profile","arguments":{"full_name":"Ada Lovelace","headline":"Backend Engineer","skills":["python","sql","aws","docker"]}}}
-
-// 3. analyse + store a job (paste the description text)
-{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"analyze_job","arguments":{"title":"Backend Engineer","company":"Acme Co","description":"We need a backend engineer with Python, SQL, and AWS to build data pipelines. PostgreSQL and Docker are a plus."}}}
-
-// 4. parse a CV (file path or pasted text)
-{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"parse_cv","arguments":{"label":"main-cv","text":"Ada Lovelace — Backend Engineer. Python, SQL, AWS, PostgreSQL. Built ETL pipelines..."}}}
-
-// 5. score the CV against the job (save=true creates a draft application)
-{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"match_cv","arguments":{"job_id":1,"cv_id":1,"save":true}}}
-
-// 6. preview autofill for a form (no submission)
-{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"autofill_form","arguments":{"application_id":1,"form_fields":[{"name":"name","label":"Full name"},{"name":"email","label":"Email"},{"name":"salary","label":"Salary expectation"}]}}}
-
-// 7. after you submit on the employer's site, mark it submitted
-{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"update_application_status","arguments":{"application_id":1,"status":"submitted"}}}
+{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"save_my_cv","arguments":{"text":"Ada Lovelace. Python, SQL, PostgreSQL."}}}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"check_this_job","arguments":{"description":"Backend engineer. Python, SQL, and AWS. Docker is a plus."}}}
 ```
-
-Step 6 returns a mapping where the `salary` field is flagged
-`requires_user_review: true` — sensitive fields always need your eyes.
 
 ---
 
@@ -299,6 +294,7 @@ All config is via environment variables. **The free core needs none of them.**
 | `JOB_MCP_CV_DIRS` | — | Extra folders `parse_cv` may read from (OS path separator: `;` on Windows, `:` elsewhere). |
 | `JOB_MCP_HTTP_PORT` | `8787` | Port for the local HTTP bridge (loopback only). |
 | `JOB_MCP_HTTP_TOKEN` | — | Optional bearer token the bridge requires on `/call`. |
+| `JOB_MCP_ALL_TOOLS` | unset | Set to `1` to list every tool. Unset, chat and the HTTP bridge expose only `save_my_cv` and `check_this_job`. |
 
 The following enable **your own AI key** (works on Free **or** Pro) and are
 placeholders for future hosted Pro/cloud services (see `.env.example`):
@@ -372,6 +368,9 @@ npm run serve:http      # 127.0.0.1:8787 by default
 
 Endpoints: `GET /health`, `POST /call` with `{"name","arguments"}`. Optional
 bearer auth via `JOB_MCP_HTTP_TOKEN`. Source: [`src/http.ts`](./src/http.ts).
+The bridge lists the same tools as the stdio server. Start it with
+`JOB_MCP_ALL_TOOLS=1` for the Chrome extension. The desktop app sets that
+itself.
 
 ### Chrome extension — `extension/`
 

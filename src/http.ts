@@ -11,9 +11,8 @@
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { pathToFileURL } from "node:url";
-import { toolByName, tools } from "./tools/index.js";
 import { openDb } from "./store/db.js";
-import { createServer as createMcpServer } from "./server.js";
+import { createServer as createMcpServer, listedTools } from "./server.js";
 import { safeEqual } from "./lib/crypto.js";
 import { buildSystemReport } from "./lib/detect.js";
 import {
@@ -104,7 +103,7 @@ export async function handle(req: IncomingMessage, res: ServerResponse): Promise
   if (req.url === "/health" && req.method === "GET") {
     send(res, 200, {
       ok: true,
-      data: { tools: tools.map((t) => t.name) },
+      data: { tools: listedTools().map((t) => t.name) },
     }, req);
     return;
   }
@@ -203,7 +202,7 @@ export async function handle(req: IncomingMessage, res: ServerResponse): Promise
       send(res, 400, { ok: false, error: "invalid JSON body" }, req);
       return;
     }
-    const tool = toolByName.get(parsed.name ?? "");
+    const tool = listedTools().find((t) => t.name === (parsed.name ?? ""));
     if (!tool) {
       send(res, 404, { ok: false, error: `unknown tool: ${parsed.name}` }, req);
       return;

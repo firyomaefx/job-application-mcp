@@ -139,12 +139,14 @@ test("POST /call system_check returns the same report shape as /detect", async (
     }
     return realFetch(url, init);
   }) as typeof fetch;
+  process.env.JOB_MCP_ALL_TOOLS = "1";
   try {
     const r = await req("/call", "POST", { name: "system_check", arguments: {} });
     assert.equal(r.status, 200);
     assert.equal(r.json.tool, "system_check");
     assert.ok(r.json.data.ai && r.json.data.data && r.json.data.bridge);
   } finally {
+    delete process.env.JOB_MCP_ALL_TOOLS;
     globalThis.fetch = original;
   }
 });
