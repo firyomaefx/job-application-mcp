@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Job Application MCP — Portal</title>
+    <style>
+      :root { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; color: #0f172a; }
+      h1 { font-size: 1.4rem; }
+      .card { border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem 1.25rem; margin: 1rem 0; }
+      .muted { color: #64748b; font-size: 0.9rem; }
+      button { background: #4f46e5; color: #fff; border: 0; border-radius: 8px; padding: 0.5rem 1rem; cursor: pointer; }
+      button:disabled { opacity: 0.6; }
+      input[type="url"] { width: 100%; padding: 0.45rem; margin: 0.35rem 0; }
+      #log { white-space: pre-wrap; font-size: 0.85rem; background: #f8fafc; padding: 0.75rem; border-radius: 8px; min-height: 2rem; }
+    </style>
+  </head>
+  <body>
+    <h1>Job Application MCP</h1>
+    <p class="muted">Uploads and apply clicks buffer on Cloudflare until your laptop syncs. Set <code>API_BASE</code> below to your Worker URL.</p>
+
+    <section class="card">
+      <h2>1. Résumé upload</h2>
+      <input type="file" id="file" accept=".pdf,.doc,.docx,.txt" />
+      <p><button type="button" id="upload">Upload</button></p>
+    </section>
+
+    <section class="card">
+      <h2>2. Apply to job URL</h2>
+      <input type="url" id="job-url" placeholder="https://boards.greenhouse.io/…" />
+      <p><button type="button" id="apply">Queue apply</button></p>
+    </section>
+
+    <section class="card">
+      <h2>Status</h2>
+      <div id="log" class="muted">Waiting…</div>
+    </section>
+
+    <script>
+      // Set when deploying Pages: window.API_BASE = "https://your-worker.workers.dev";
+      const API_BASE = window.API_BASE || "";
+      const API_TOKEN = window.API_TOKEN || "";
+
+      function log(msg) {
+        document.getElementById("log").textContent = msg;
+      }
+
+      async function api(path, init) {
+        if (!API_BASE || !API_TOKEN) {
+          log("Configure API_BASE and API_TOKEN (see edge/pages/README.md).");
+          throw new Error("not configured");
+        }
+        const res = await fetch(API_BASE + path, {
+          ...init,
+          headers: {
+            ...(init.headers || {}),
+            Authorization: "Bearer " + API_TOKEN,
+          },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || res.statusText);
+        return data;
+      }
+
+      document.getElementById("upload").onclick = async () => {
+        const f = document.getElementById("file").files[0];
+        if (!f) { log("Pick a file first."); return; }
+        const fd = new FormData();
+        fd.append("file", f);
+        try {
+          const res = await fetch(API_BASE + "/api/resume", {
+            method: "POST",
+            headers: { Authorization: "Bearer " + API_TOKEN },
+            body: fd,
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error);
+          log("Uploaded " + data.data.id + ". Laptop will ingest on next sync.");
+        } catch (e) {
+          log("Upload failed: " + e.message);
+        }
+      };
+
+      document.getElementById("apply").onclick = async () => {
+        const url = document.getElementById("job-url").value.trim();
+        if (!url) { log("Enter an apply URL."); return; }
+        try {
+          const data = await api("/api/apply", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url }),
+          });
+          log("Queued apply " + data.data.id + " — sync runs on your PC.");
+        } catch (e) {
+          log(e.message);
+        }
+      };
+    </script>
+  </body>
+</html>
