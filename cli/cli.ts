@@ -1,10 +1,14 @@
 #!/usr/bin/env node
+import { readFileSync } from "node:fs";
 import { createServer } from "../src/server.js";
+import { checkThisJob, saveMyCv } from "../src/simple.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
 const HELP = `job-application-mcp — local-first job application assistant (MCP)
 
 Usage:
+  job-mcp cv <file>    Save your CV from a text file. Prints one line.
+  job-mcp job <file>   Score a job description file against the saved CV.
   job-mcp serve        Start the MCP server over stdio (for MCP clients).
   job-mcp serve:http   Start the local HTTP bridge (127.0.0.1:8787 by default).
                        Used by the Chrome extension and other non-stdio clients.
@@ -29,6 +33,7 @@ Environment:
   JOB_MCP_DATA_DIR      Local data directory (default ./data)
   JOB_MCP_HTTP_PORT     HTTP bridge port (default 8787)
   JOB_MCP_HTTP_TOKEN    Optional bearer token for the HTTP bridge
+  JOB_MCP_ALL_TOOLS     Set to 1 to expose the full tool list (default is cv + job only)
   AI_PROVIDER           mock | openai | anthropic | ollama (default mock)
   AI_API_KEY            Your own key for openai/anthropic (ollama needs none)
   AI_MODEL              Model id (ollama default: llama3.1)
@@ -50,6 +55,16 @@ async function main(): Promise<void> {
     process.stdout.write(HELP);
     return;
   }
+  if (arg === "cv") {
+    const text = readUserFile(process.argv[3], "cv");
+    process.stdout.write(saveMyCv(text).say + "\n");
+    return;
+  }
+  if (arg === "job") {
+    const text = readUserFile(process.argv[3], "job");
+    process.stdout.write(checkThisJob({ description: text }).say + "\n");
+    return;
+  }
   if (arg === "serve") {
     const server = createServer();
     const transport = new StdioServerTransport();
@@ -68,6 +83,19 @@ async function main(): Promise<void> {
   }
   process.stderr.write(`Unknown command: ${arg}\n\n${HELP}`);
   process.exit(1);
+}
+
+function readUserFile(path: string | undefined, command: string): string {
+  if (!path) {
+    process.stderr.write(`usage: job-mcp ${command} <file>\n`);
+    process.exit(1);
+  }
+  try {
+    return readFileSync(path, "utf8");
+  } catch {
+    process.stderr.write(`Cannot read ${path}\n`);
+    process.exit(1);
+  }
 }
 
 async function runLicence(args: string[]): Promise<void> {
