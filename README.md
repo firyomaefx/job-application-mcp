@@ -2,11 +2,10 @@
 
 # Job Application MCP
 
-**A local-first, open-source job application assistant built on the
+**A local-first, open-source job assistant on the
 [Model Context Protocol](https://modelcontextprotocol.io).**
 
-Analyse jobs · Match against your CV · Tailor documents · Preview forms · Track applications —
-**all on your machine, nothing uploaded, submission stays in your hands.**
+📋 **Paste your CV · Paste a job · Get a score card** — on your machine, nothing uploaded, **you** still hit Submit.
 
 [![License: AGPL-3.0-or-later](https://img.shields.io/badge/License-AGPL--3.0--or--later-blue.svg)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A522-green.svg)](https://nodejs.org)
@@ -19,124 +18,96 @@ Analyse jobs · Match against your CV · Tailor documents · Preview forms · Tr
 
 ## Table of contents
 
-- [Why](#why)
-- [What it does (free core)](#what-it-does-free-core)
-- [What it deliberately does NOT do](#what-it-deliberately-does-not-do)
-- [How it works](#how-it-works)
-- [Quick start](#quick-start)
-- [Connect an MCP client](#connect-an-mcp-client)
-- [Everyday use](#everyday-use)
-- [Tools reference](#tools-reference)
-- [A full example flow](#a-full-example-flow)
-- [Configuration](#configuration)
-- [Project layout](#project-layout)
-- [Companion apps](#companion-apps)
-- [Develop](#develop)
-- [How matching works](#how-matching-works)
-- [Privacy & data](#privacy--data)
-- [Roadmap / Pro upgrade](#roadmap--pro-upgrade)
-- [Limitations](#limitations)
-- [License](#license)
-- [Contributing](#contributing)
+- [🚀 Start here in 2 minutes](#-start-here-in-2-minutes)
+- [📖 New to MCP?](#-new-to-mcp)
+- [⚡ Quick start](#-quick-start)
+- [💬 Connect your AI app](#-connect-your-ai-app)
+- [📋 Everyday use](#-everyday-use)
+- [🛑 What we will NOT do](#-what-we-will-not-do)
+- [🎯 Sample score card](#-sample-score-card)
+- [🔧 Power users](#-power-users)
+- [🔒 Privacy and data](#-privacy-and-data)
+- [⚙️ Configuration](#configuration)
+- [🛠️ For developers](#for-developers)
+- [📜 License](#-license)
+- [🤝 Contributing](#-contributing)
 
 ---
 
-## Why
+## 🚀 Start here in 2 minutes
 
-Job hunting is repetitive: read a posting, check it against your CV, tweak a cover
-letter, fill the same fields on yet another form, and remember where you applied.
+Job hunting is repetitive. This project helps you answer one question fast: **does my CV look like a fit for this posting?**
 
-**Job Application MCP** turns that into a set of tools any MCP-compatible AI client
-(Claude Desktop, Claude Code, others) can drive for you — **while keeping you in
-control**:
+You don’t need to be a developer 🙂. Most people only need **four short steps**:
 
-- Your CV and applications never leave your machine in the free core.
-- The assistant prepares and previews; **you** review and submit.
-- It's open source under AGPL-3.0, so you can audit exactly what it does.
+1. **Install once** — follow [Quick start](#-quick-start) (Node 22 + `npm install` + `npm run build`).
+2. **Paste your CV** — in chat: tool `save_my_cv`, or in terminal: `job-mcp cv cv.txt`.
+3. **Paste the job description** — in chat: tool `check_this_job`, or in terminal: `job-mcp job job.txt`.
+4. **Read the card** — use the text exactly as returned. The server does not invent job titles, employers, dates, or skills.
 
-> ℹ️ This repository is the **free community core** described in
-> [`BUSINESS_PROPOSAL.md`](./BUSINESS_PROPOSAL.md). Paid AI/cloud/business services
-> are intentionally out of scope here.
+> ✅ **Lazy mode:** A connected chat app sees **only 2 tools** by default (`save_my_cv` and `check_this_job`), not 41. That saves tokens and stops the AI from guessing which step to run.
+
+Want tracking, cover letters, and the rest? See [Power users](#-power-users) and set `JOB_MCP_ALL_TOOLS=1`.
 
 ---
 
-## What it does (free core)
+## 📖 New to MCP?
 
-| Capability | Description |
+| Term | Plain English |
 | --- | --- |
-| 🧩 **Local MCP server** | A stdio server you connect from any MCP client. |
-| 👤 **Candidate profile** | One local profile: skills, headline, contact, summary. |
-| 📄 **CV parsing** | Parse **PDF / DOCX / TXT** locally — no upload, no network. |
-| 🔍 **Job analysis** | Paste a job description; get extracted key skills + a short summary. |
-| 🎯 **Match scoring** | Heuristic **0–100** score with matched / missing skills. |
-| ✂️ **Tailoring suggestions** | Structural advice on which skills to surface or add. |
-| ✍️ **Answer drafting** | A template starter for screening questions (you rewrite it). |
-| 📝 **Form autofill preview** | Maps your profile onto form fields — **preview only, never submits**. |
-| 📊 **Application tracking** | Local SQLite store with a status pipeline (draft → submitted → offer…). |
-
-## What it deliberately does NOT do
-
-- ❌ **No automated submission.** You submit manually on the employer's site.
-- ❌ **No automation of LinkedIn or Indeed** — their Terms of Service prohibit it. Paste the description and complete those by hand.
-- ❌ **No CAPTCHA solving, 2FA bypass, or login recovery** — it pauses for manual action.
-- ❌ **No AI rewriting, cloud sync, or premium adapters** — those are future Pro/cloud services.
-
-These aren't missing features; they're the design.
-
----
-
-## How it works
+| **MCP** | A plug-in protocol so apps like Claude Desktop or Cursor can call small programs on your computer (“tools”). |
+| **This repo** | A local helper that scores your CV against a job posting. It is **not** a job board and it does **not** apply for you. |
+| **Tool** | One action the server can run. The default pair is “save CV” and “check job”. |
+| **Your data** | Stays in a folder on your PC (default `./data`). The free two-paste path does not call the cloud. |
 
 ```text
-┌─────────────────┐      stdio (JSON-RPC)      ┌──────────────────────┐
-│  MCP client     │  ◀────────────────────────▶│  job-application-mcp │
-│  (Claude, etc.) │                             │  (this server)       │
-└─────────────────┘                             └──────────┬───────────┘
-                                                           │ reads / writes
-                                                           ▼
-                                                ┌──────────────────────┐
-                                                │  local SQLite DB     │
-                                                │  + parsed CV text    │
-                                                │  (JOB_MCP_DATA_DIR)  │
-                                                └──────────────────────┘
+┌─────────────────┐                         ┌──────────────────────┐
+│  Claude/Cursor  │  ◀──── local chat ────▶  │  job-application-mcp │
+│  (optional)     │                         │  (this server)       │
+└─────────────────┘                         └──────────┬───────────┘
+                                                     │ saves on disk
+                                                     ▼
+                                          ┌──────────────────────┐
+                                          │  ./data  (SQLite)    │
+                                          └──────────────────────┘
 ```
 
-You (or an AI client) call **tools**. Each tool does a small, auditable thing and
-returns structured JSON. Tools that touch external sites do not exist; everything
-operates on data you provide and store locally.
+> ℹ️ Paid cloud/Pro services described in [`BUSINESS_PROPOSAL.md`](./BUSINESS_PROPOSAL.md) are **out of scope** for this repo’s free core.
 
 ---
 
-## Quick start
+## ⚡ Quick start
 
 ### Requirements
 
-- **Node.js ≥ 22** (uses the built-in `node:sqlite` — no native compilation needed)
-- npm
+- **Node.js ≥ 22** (built-in SQLite — no extra database install)
+- **npm**
 
-### Install & build
+### Install and build
 
 ```bash
-git clone https://github.com/<your-user>/job-application-mcp.git
+git clone https://github.com/firyomaefx/job-application-mcp.git
 cd job-application-mcp
 npm install
-npm run build      # -> dist/
+npm run build      # writes dist/
 ```
 
-### Verify it works
+### Check it runs
 
 ```bash
-npm test           # full unit/integration test suite
 node dist/cli/cli.js --help
+# should list: cv, job, serve, serve:http, …
 ```
+
+Optional: `npm test` runs the full test suite (for contributors).
 
 ---
 
-## Connect an MCP client
+## 💬 Connect your AI app
 
-Build the project, then add the server to your MCP client's config.
+Build the project, then tell your MCP client how to start the server.
 
-### Claude Desktop / Claude Code
+### Claude Desktop / Claude Code / Cursor
 
 ```jsonc
 {
@@ -149,360 +120,332 @@ Build the project, then add the server to your MCP client's config.
 }
 ```
 
-> ⚠️ Use an **absolute** path — MCP clients launch the server from their own
-> working directory, not yours.
+> ⚠️ Use a real **absolute** path. MCP clients start the server from *their* working directory, not yours.
 
-### Run directly (no client)
+Restart the client. You should see **two tools**: `save_my_cv` and `check_this_job`.
+
+### No chat app? Use the terminal only
 
 ```bash
-node dist/cli/cli.js serve      # equivalent to: node dist/src/index.js
+node dist/cli/cli.js cv my-cv.txt
+node dist/cli/cli.js job posting.txt
 ```
 
-The server speaks JSON-RPC over stdio. A chat client sees two tools. See
-[Everyday use](#everyday-use).
+Same logic, zero AI tokens ✨
 
 ---
 
-## Everyday use
+## 📋 Everyday use
 
-Paste your CV, then paste a job. The server scores it locally and returns a short card. It does not invent a job title, an employer, or skills that are not in your CV.
+### In chat (Claude, Cursor, …)
 
-In a chat client the tools are `save_my_cv` (`text`) and `check_this_job` (`description`). Show the returned text as-is.
+Say what you mean in plain language; the assistant should call the tool and show you the result **unchanged**:
 
-From the terminal, with no chat model:
+1. *“Save this as my CV:”* + paste résumé text → `save_my_cv`
+2. *“Check this job:”* + paste posting → `check_this_job`
+
+**Example replies you might send:**
+
+> Here’s my CV: Ada Lovelace. Backend engineer. Python, SQL, PostgreSQL, ETL pipelines…
+
+> Here’s the job: We need Python, SQL, and AWS. Docker is a plus.
+
+The tool text is the product — don’t let the model “improve” skills or add employers.
+
+### In the terminal
+
+Put text in two files, then:
 
 ```bash
 job-mcp cv cv.txt
 job-mcp job job.txt
 ```
 
-If no CV is saved, `check_this_job` stops with `No CV saved. Paste your CV first.` and stores nothing.
+(`job-mcp` works after `npm run build` from the project root, or install the package globally.)
 
-Set `JOB_MCP_ALL_TOOLS=1` to expose the full tool list below (profile, matching, reminders, admin, and the rest). The desktop app sets this for itself. The default chat config does not.
+### If you check a job before saving a CV
 
----
-
-## Tools reference
-
-The tools below are the full list, available when `JOB_MCP_ALL_TOOLS=1`. They are local and synchronous-ish (CV parsing and AI calls are async). Arguments are validated with zod; the MCP client receives a JSON Schema for each. The **credits/Pro** and **admin/business** tools are wire-ready seams for the hosted Pro service (see [Business model](#business-model)); they run locally today and do not require any subscription.
-
-### Profile
-
-| Tool | Args | Returns |
-| --- | --- | --- |
-| `get_profile` | — | The local candidate profile (auto-created on first call). |
-| `update_profile` | `full_name?, email?, phone?, location?, headline?, summary?, skills?, experience_years?` | Updated profile. `skills` replaces the list. |
-
-### CVs
-
-| Tool | Args | Returns |
-| --- | --- | --- |
-| `parse_cv` | `file_path?` **or** `text`, `label?` | Parsed CV stored locally; detected skills + a short preview. |
-| `list_cvs` | — | All stored CVs. |
-
-`parse_cv` supports `.pdf` (pdf-parse), `.docx` (mammoth), and plain text. If you
-pass `text`, it's stored as-is. `file_path` must be inside the data dir (or a
-folder listed in `JOB_MCP_CV_DIRS`) — paths outside the allow-list are rejected,
-so an MCP client can't read arbitrary files.
-
-### Jobs
-
-| Tool | Args | Returns |
-| --- | --- | --- |
-| `analyze_job` | `description` (≥20 chars), `title?, company?, url?, store?=true` | Extracted keywords + summary; stored as a job (unless `store: false`). |
-| `get_job` | `job_id` | A stored job with its keywords. |
-
-### Matching & prep
-
-| Tool | Args | Returns |
-| --- | --- | --- |
-| `match_cv` | `job_id`, `cv_id`, `save?=false` | 0–100 score, matched/missing/extra skills; optionally creates a draft application. |
-| `tailor_cv` | `job_id`, `cv_id` | Tailored CV draft. With your own AI API key (`AI_API_KEY`): AI-rewritten prose; without: heuristic local draft. |
-| `cover_letter` | `job_id`, `cv_id` | Cover-letter draft (AI with your own key, else heuristic). |
-| `draft_answer` | `question`, `cv_id?, job_id?` | Screening-answer draft (AI with your own key, else heuristic template). Always review. |
-
-> **AI tools and your own key.** `tailor_cv`, `cover_letter`, and `draft_answer`
-> use a real AI provider when you set `AI_PROVIDER` (`openai` or `anthropic`) and
-> `AI_API_KEY` — on the Free **or** Pro plan. Without a key they fall back to a
-> local heuristic. The Pro *hosted* path additionally debits an AI credit; using
-> your own key is never debited. See [Business model](#business-model).
-
-### Applications & forms
-
-| Tool | Args | Returns |
-| --- | --- | --- |
-| `save_application` | `job_id`, `cv_id?, match_score?, tailored_cv_text?, cover_letter?, answers?, notes?` | A **draft** application record. Does not submit. |
-| `list_applications` | `status?` | Application records (optionally filtered by status). |
-| `update_application_status` | `application_id`, `status`, `notes?` | Updates status; sets `submitted_at` when status is `submitted`. |
-| `autofill_form` | `application_id`, `form_fields?` | A **preview** mapping of profile data onto form fields. Nothing is submitted. |
-
-**Status pipeline:** `draft → ready → submitted → interview → offer → rejected → closed`.
-
-### Analytics & status
-
-| Tool | Args | Returns |
-| --- | --- | --- |
-| `application_analytics` | — | Counts by status, average match score, recent activity. Pro entitlement adds an advanced breakdown. |
-| `status` | — | Server/plan/credits snapshot (plan label, AI credit balance, active features). |
-
-### Credits & Pro (wire-ready seams)
-
-| Tool | Args | Returns |
-| --- | --- | --- |
-| `credits` | — | Current AI credit balance + recent ledger entries. |
-| `topup_credits` | `code`, `amount` | Apply an AI-credit top-up code (idempotent per code). Admin/test. |
-| `grant_monthly_credits` | `amount?` | Grant the monthly AI allowance (idempotent per calendar month). Admin/test. |
-
-### Admin / business (wire-ready seams)
-
-| Tool | Args | Returns |
-| --- | --- | --- |
-| `admin_create_account` | `email`, `name`, `plan?` | Create a business account. |
-| `admin_add_candidate` | `account_id`, `profile_id`, `role?` | Add a candidate/coach to an account. |
-| `admin_list_team` | `account_id` | List an account's team members. |
-| `admin_usage_report` | `account_id` | Usage summary for an account. |
-
----
-
-## A full example flow
-
-Connect the server, paste a CV, paste a job, read the card.
-
-```bash
-node dist/cli/cli.js cv cv.txt
-node dist/cli/cli.js job job.txt
-```
-
-`cv.txt` is your CV. `job.txt` is the posting. The second command prints the score, the skills in both texts, the skills only in the job, and a five-line note that names only the matched skills. The role line stays `Untitled role`.
-
-The same two steps over MCP:
-
-```jsonc
-{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"save_my_cv","arguments":{"text":"Ada Lovelace. Python, SQL, PostgreSQL."}}}
-{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"check_this_job","arguments":{"description":"Backend engineer. Python, SQL, and AWS. Docker is a plus."}}}
-```
-
----
-
-## Configuration
-
-All config is via environment variables. **The free core needs none of them.**
-
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `JOB_MCP_DATA_DIR` | `./data` | Where the SQLite DB and parsed data live. |
-| `JOB_MCP_CV_DIRS` | — | Extra folders `parse_cv` may read from (OS path separator: `;` on Windows, `:` elsewhere). |
-| `JOB_MCP_HTTP_PORT` | `8787` | Port for the local HTTP bridge (loopback only). |
-| `JOB_MCP_HTTP_TOKEN` | — | Optional bearer token the bridge requires on `/call`. |
-| `JOB_MCP_ALL_TOOLS` | unset | Set to `1` to list every tool. Unset, chat and the HTTP bridge expose only `save_my_cv` and `check_this_job`. |
-
-The following enable **your own AI key** (works on Free **or** Pro) and are
-placeholders for future hosted Pro/cloud services (see `.env.example`):
-
-| Variable | Purpose |
-| --- | --- |
-| `AI_PROVIDER` / `AI_API_KEY` | `openai` or `anthropic` + your own key → real AI drafts for `tailor_cv` / `cover_letter` / `draft_answer`. Keys entered in the desktop UI are session-only; use the environment for restart persistence. |
-| `AI_MODEL` / `AI_BASE_URL` | Optional model + base URL override (e.g. an OpenAI-compatible endpoint). |
-| `JOB_MCP_LICENCE_SERVER` | Pro licence activation endpoint (hosted service). |
-| `SUPABASE_URL` / `SUPABASE_ANON_KEY` | Cloud sync & auth (Pro, hosted). |
-
----
-
-## Project layout
+You get exactly:
 
 ```text
-job-application-mcp/
-├── src/
-│   ├── index.ts           # stdio MCP server entrypoint
-│   ├── http.ts            # local HTTP bridge entrypoint (127.0.0.1)
-│   ├── server.ts          # server factory + tool registry
-│   ├── tools/             # task and compatibility MCP tools
-│   │   ├── types.ts       # ToolDef / AnyTool / result helpers
-│   │   ├── profile.ts     # get/update_profile
-│   │   ├── cv.ts          # parse_cv, list_cvs
-│   │   ├── job.ts         # analyze_job, get_job
-│   │   ├── matching.ts    # match_cv, tailor_cv, cover_letter, draft_answer
-│   │   ├── application.ts # save/list/update_application, autofill_form
-│   │   ├── analytics.ts   # application_analytics, status
-│   │   ├── pro.ts         # credits, topup_credits, grant_monthly_credits
-│   │   └── admin.ts       # admin_create_account / add_candidate / list_team / usage_report
-│   ├── store/             # SQLite layer (node:sqlite)
-│   │   ├── db.ts          # open / migrate / close / reset
-│   │   ├── profile.ts     # profile CRUD
-│   │   └── applications.ts# cv / job / application CRUD
-│   ├── cv/parser.ts       # PDF / DOCX / TXT parsing (path allow-listed)
-│   ├── ai/                # provider abstraction (mock / openai / anthropic)
-│   ├── licence/           # entitlement tokens + credits + referrals
-│   ├── payments/          # payment-webhook seam (server-side, not in clients)
-│   ├── sync/              # cloud-sync seam (local no-op until Pro)
-│   ├── features.ts        # feature gating (plan + credits + AI mode)
-│   └── lib/
-│       ├── types.ts       # domain types
-│       ├── crypto.ts      # HMAC-SHA256 + constant-time compare
-│       ├── entitlement.ts # Entitlement value type + plan limits
-│       └── scoring.ts     # keyword extraction + match scoring (pure)
-├── cli/cli.ts             # human CLI: job-mcp serve | serve:http | --help
-├── extension/             # Chrome MV3 extension (form capture → preview)
-├── desktop/               # Electron wrapper UI (launches the bridge)
-├── .github/workflows/ci.yml  # build + typecheck + test + stdio smoke
-├── .github/workflows/daily-effectiveness.yml # scheduled regression gate
-├── evals/                 # synthetic effectiveness fixtures + thresholds
-├── tests/                 # node:test suite
-├── BUSINESS_PROPOSAL.md   # open-core + paid-service model
-├── CLAUDE.md              # guide for Claude Code working in this repo
-└── LICENSE                # AGPL-3.0-or-later
+No CV saved. Paste your CV first.
 ```
+
+Nothing is stored. Paste the CV first, then try again.
+
+### More than matching?
+
+Set environment variable `JOB_MCP_ALL_TOOLS=1` before starting the server or HTTP bridge to unlock [all tools](#all-tools-reference) (tracking, tailoring, autofill preview, etc.). The [desktop app](#desktop-app--desktop) sets this for its bundled bridge automatically.
 
 ---
 
-## Companion apps
+## 🛑 What we will NOT do
 
-The free core is the stdio MCP server above. Two optional companions live in this
-repo and talk to a **local HTTP bridge** (same tools, loopback only):
+These limits are **on purpose** — not bugs:
 
-### HTTP bridge
+- ❌ **No auto-submit.** You click Apply on the employer’s site.
+- ❌ **No LinkedIn / Indeed bots.** Paste the description; fill forms yourself (their ToS forbid automation).
+- ❌ **No CAPTCHA / 2FA hacking.** You handle security steps.
+- ❌ **No fake facts on the default path.** The two-paste card only names skills found in *your* CV text.
+
+---
+
+## 🎯 Sample score card
+
+After CV + job, a successful `check_this_job` looks like this (your numbers and skills will differ):
+
+```text
+Role: Untitled role
+Score: 67/100
+In both: python, sql
+Only in the job: aws, docker
+Matched skills you can name: python, sql.
+These are the only skills this card supports.
+Do not add employers.
+Do not add dates.
+Do not add numbers.
+```
+
+- **Role** stays `Untitled role` on the default path (the first line of a posting is **not** treated as a title).
+- **Score** is a local keyword match (0–100), not an AI opinion.
+
+If you skipped the CV step, you only see: `No CV saved. Paste your CV first.`
+
+---
+
+## 🔧 Power users
+
+### What else exists (when `JOB_MCP_ALL_TOOLS=1`)
+
+| Capability | What it’s for |
+| --- | --- |
+| 🧩 **Full MCP tool set** | Profile, CV files, job inbox, applications, reminders, backups, … |
+| 📄 **CV parsing** | PDF / DOCX / TXT from allowed folders |
+| ✍️ **Drafts** | Cover letter & answers (heuristic, or your own AI key) |
+| 📝 **Autofill preview** | Map profile fields — **preview only** |
+| 📊 **Tracking** | Local application status pipeline |
+
+### Companion apps
+
+#### HTTP bridge
 
 ```bash
 npm run serve:http      # 127.0.0.1:8787 by default
 ```
 
-Endpoints: `GET /health`, `POST /call` with `{"name","arguments"}`. Optional
-bearer auth via `JOB_MCP_HTTP_TOKEN`. Source: [`src/http.ts`](./src/http.ts).
-The bridge lists the same tools as the stdio server. Start it with
-`JOB_MCP_ALL_TOOLS=1` for the Chrome extension. The desktop app sets that
-itself.
+- `GET /health` — list tools exposed on this bridge
+- `POST /call` — `{"name","arguments"}`
 
-### Chrome extension — `extension/`
+Use `JOB_MCP_ALL_TOOLS=1` for the Chrome extension. See [`src/http.ts`](./src/http.ts).
 
-Captures form fields on a career page and asks the bridge to **preview** an
-autofill mapping. Never submits. Load it unpacked from `extension/`. See
-[`extension/README.md`](./extension/README.md).
+#### Chrome extension — `extension/`
 
-### Desktop app — `desktop/`
+Captures form fields and asks the bridge for an **autofill preview**. Never submits. See [`extension/README.md`](./extension/README.md).
 
-An Electron wrapper that launches the bridge and shows a dashboard (status,
-profile, applications). Run with `cd desktop && npm install && npm start`. See
-[`desktop/README.md`](./desktop/README.md).
+#### Desktop app — `desktop/`
 
-> Both companions are **read/preview only** and reach only `127.0.0.1`. They
-> inherit the project's no-submission, no-LinkedIn/Indeed-automation rules.
+Electron UI + bundled bridge (`JOB_MCP_ALL_TOOLS=1`). See [`desktop/README.md`](./desktop/README.md).
+
+> Both companions talk only to `127.0.0.1` and never submit applications for you.
+
+### How matching works (default card)
+
+The two-paste score uses a **local, heuristic** scorer in [`src/lib/scoring.ts`](./src/lib/scoring.ts) — no AI, no network:
+
+1. Pull likely **skills/keywords** from CV and job text.
+2. Compare them (simple stem matching, e.g. `react` ≈ `reactjs`).
+3. Output score, matched, and missing lists.
+
+Treat the score as a **hint**. Always read the original posting.
+
+### Windows alpha installer
+
+GitHub **prereleases** ship a standalone x64 Windows installer (bundled bridge; no separate Node required).
+
+- Version **0.4.2** is **unsigned alpha** — SmartScreen may warn.
+- Verify the file with `SHA256SUMS.txt` on the same release before installing.
+- Not a production or paid hosted product.
+
+### Roadmap / Pro
+
+[`BUSINESS_PROPOSAL.md`](./BUSINESS_PROPOSAL.md) describes the open-core model and optional hosted Pro services (AI tailoring, sync, business accounts). The free core stays fully local.
+
+### Limitations
+
+- Keyword extraction can miss or mis-rank skills.
+- No browser automation; forms are preview-only.
+- **Alpha:** APIs and schemas may change before 1.0.
+
+### <a id="status"></a> Status
+
+**Alpha** — fine for self-hosted trial on your own machine; not a finished product release.
 
 ---
 
-## Develop
+<a id="all-tools-reference"></a>
+
+### All tools reference
+
+Skip this section unless you set **`JOB_MCP_ALL_TOOLS=1`**. Arguments are validated with zod; the MCP client gets JSON Schema for each tool. **Credits/Pro** and **admin** tools are wire-ready seams for a future hosted service; they run locally today without a subscription.
+
+#### Profile
+
+| Tool | Args | Returns |
+| --- | --- | --- |
+| `get_profile` | — | Local candidate profile (auto-created on first call). |
+| `update_profile` | `full_name?, email?, phone?, location?, headline?, summary?, skills?, experience_years?` | Updated profile. `skills` replaces the list. |
+
+#### CVs
+
+| Tool | Args | Returns |
+| --- | --- | --- |
+| `parse_cv` | `file_path?` **or** `text`, `label?` | Parsed CV stored locally; detected skills + short preview. |
+| `list_cvs` | — | All stored CVs. |
+
+`parse_cv` supports `.pdf`, `.docx`, and plain text. `file_path` must stay inside the data dir or `JOB_MCP_CV_DIRS` allow-list.
+
+#### Jobs
+
+| Tool | Args | Returns |
+| --- | --- | --- |
+| `analyze_job` | `description` (≥20 chars), `title?, company?, url?, store?=true` | Keywords + summary; stores job by default. |
+| `get_job` | `job_id` | Stored job with keywords. |
+
+#### Matching and prep
+
+| Tool | Args | Returns |
+| --- | --- | --- |
+| `match_cv` | `job_id`, `cv_id`, `save?=false` | 0–100 score; optional draft application. |
+| `tailor_cv` | `job_id`, `cv_id` | Tailored draft (AI with your key, else heuristic). |
+| `cover_letter` | `job_id`, `cv_id` | Cover-letter draft. |
+| `draft_answer` | `question`, `cv_id?, job_id?` | Screening-answer draft. Review before sending. |
+
+> **Your own AI key:** set `AI_PROVIDER` + `AI_API_KEY` for real drafts on `tailor_cv`, `cover_letter`, and `draft_answer`. Without a key, outputs stay heuristic and local.
+
+#### Applications and forms
+
+| Tool | Args | Returns |
+| --- | --- | --- |
+| `save_application` | `job_id`, `cv_id?, match_score?, …` | Draft application record. Does not submit. |
+| `list_applications` | `status?` | Application list. |
+| `update_application_status` | `application_id`, `status`, `notes?` | Updates status pipeline. |
+| `autofill_form` | `application_id`, `form_fields?` | **Preview** mapping only. |
+
+**Status pipeline:** `draft → ready → submitted → interview → offer → rejected → closed`.
+
+#### Analytics, credits, admin
+
+| Tool | Purpose |
+| --- | --- |
+| `application_analytics`, `status` | Counts and server snapshot |
+| `credits`, `topup_credits`, `grant_monthly_credits` | Credit ledger (Pro seam) |
+| `admin_*` | Business-tier account tools (seam) |
+
+(Default path tools `save_my_cv` and `check_this_job` are always available even when the full list is hidden.)
+
+---
+
+## 🔒 Privacy and data
+
+- **Local-first.** CVs and applications live in `JOB_MCP_DATA_DIR` (default `./data`), gitignored on the repo side — your machine only.
+- **Two-paste path:** scoring runs locally; no CV upload to this project’s servers.
+- **Your AI keys** are not stored in SQLite. Desktop UI keys are session-only unless you set env vars.
+- **Logs:** CV text and PII are not logged at info level.
+- **Sensitive form fields** (salary, work authorization, etc.) are flagged for human review when using `autofill_form`.
+- **Nuclear option:** delete the `data` folder to wipe local state.
+
+Optional outbound calls only if **you** configure them (OpenAI, Anthropic, Ollama, licence server, update feed).
+
+---
+
+<a id="configuration"></a>
+
+## ⚙️ Configuration
+
+**The two-paste path needs no env vars.** Everything below is optional.
+
+### Everyday / paths
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `JOB_MCP_DATA_DIR` | `./data` | SQLite DB and parsed files |
+| `JOB_MCP_ALL_TOOLS` | unset | `1` = expose all 41 tools (else only `save_my_cv` + `check_this_job`) |
+
+### HTTP bridge / companions
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `JOB_MCP_HTTP_PORT` | `8787` | Loopback bridge port |
+| `JOB_MCP_HTTP_TOKEN` | — | Optional bearer token for `/call` |
+| `JOB_MCP_CV_DIRS` | — | Extra folders for `parse_cv` reads |
+
+### AI and Pro (power tools only)
+
+| Variable | Purpose |
+| --- | --- |
+| `AI_PROVIDER` / `AI_API_KEY` | Your OpenAI/Anthropic (or compatible) key for drafts |
+| `AI_MODEL` / `AI_BASE_URL` | Model and endpoint overrides (Ollama-friendly) |
+| `JOB_MCP_LICENCE_SERVER` | Pro licence activation (hosted) |
+| `SUPABASE_URL` / `SUPABASE_ANON_KEY` | Future cloud sync (Pro) |
+
+See [`.env.example`](./.env.example) for placeholders.
+
+---
+
+<a id="for-developers"></a>
+
+## 🛠️ For developers
+
+### Commands
 
 ```bash
 npm run build       # tsc -> dist/
 npm run typecheck   # tsc --noEmit
-npm test            # node --test (scoring + store)
-npm run eval:effectiveness # synthetic safety/effectiveness report
+npm test            # node:test suite
+npm run serve:http  # local bridge
 npm run dev         # tsc --watch
 ```
 
-GitHub also runs the deterministic effectiveness gate daily at 01:17 UTC
-(09:17 Malaysia time). It uses synthetic fixtures, makes no model calls, and
-never changes code or user data automatically. See
-[`docs/EFFECTIVENESS.md`](./docs/EFFECTIVENESS.md) for metrics and limits.
+Daily effectiveness gate (synthetic, no user data): [`docs/EFFECTIVENESS.md`](./docs/EFFECTIVENESS.md).
+
+### Project layout
+
+```text
+job-application-mcp/
+├── src/
+│   ├── index.ts, http.ts, server.ts
+│   ├── simple.ts          # saveMyCv / checkThisJob (default path)
+│   ├── tools/             # MCP tool definitions (+ simple.ts)
+│   ├── store/             # SQLite
+│   ├── lib/scoring.ts     # keyword match (default card)
+│   └── ai/                # optional providers
+├── cli/cli.ts             # job-mcp cv | job | serve …
+├── desktop/, extension/   # companions
+└── tests/
+```
 
 ### Adding a tool
 
-1. Create `src/tools/<name>.ts` exporting a `ToolDef<z.ZodObject<…>>`.
-2. Register it in `src/tools/index.ts` (add to the `tools` array).
-3. Add a test in `tests/` if it has pure logic worth covering.
+1. Add `src/tools/<name>.ts` with a `ToolDef`.
+2. Register in `src/tools/index.ts`.
+3. Add tests under `tests/` when logic is non-trivial.
 
-Tools receive parsed, typed input and return a `ToolResult` (`{ summary, data?, notes? }`).
-The server handles JSON Schema generation, validation, and error wrapping for you.
-
----
-
-## How matching works
-
-Matching is a **pure, heuristic** function in [`src/lib/scoring.ts`](./src/lib/scoring.ts) — no AI, no network.
-
-1. **Extract keywords** from the job description: tokenize, drop stopwords and
-   filler verbs, weight tech hints and frequent terms.
-2. **Score**: for each job keyword, check the candidate's curated profile skills
-   **plus** skills detected in the CV text. Stem-ish matches count (e.g.
-   `react` ≈ `reactjs`).
-3. **Result**: `score` (0–100), `matched`, `missing`, `extra`, and `notes`
-   (e.g. "Below 50% — consider tailoring or skipping").
-
-Formula: `score = matched/total × 100` plus a small, capped breadth bonus for
-extra skills (only when there are job keywords). It's intentionally simple and
-auditable — a baseline you can replace with the Pro AI scorer later.
+Conventions: [`CLAUDE.md`](./CLAUDE.md).
 
 ---
 
-## Privacy & data
-
-- **Local-first by default.** CVs, profile, and applications live in
-  `JOB_MCP_DATA_DIR` (default `./data`), which is gitignored. Ollama and the
-  heuristic stay local; configuring OpenAI, Anthropic, an update feed, or a
-  licence endpoint enables the corresponding outbound request.
-- **Provider keys are not stored in SQLite.** Desktop-entered keys last only for
-  the bridge process; environment variables can provide restart persistence.
-- **No PII in logs.** CV text and personal fields aren't logged at info level.
-- **Sensitive fields are flagged.** `autofill_form` marks salary, authorization,
-  gender, disability, and consent fields as `requires_user_review: true`.
-
-## Windows alpha installer
-
-GitHub prereleases provide a standalone x64 one-click Setup executable. The
-installer bundles the local bridge, so a separate Node.js installation is not
-required. Version 0.4.2 is intentionally **unsigned alpha software**: Windows
-SmartScreen may display a warning. Verify the downloaded file against
-`SHA256SUMS.txt` from the same GitHub prerelease before running it. This is not
-a production-ready hosted or paid release.
-- **You can wipe everything** by deleting the data directory.
-
----
-
-## Roadmap / Pro upgrade
-
-The free core is the foundation. [`BUSINESS_PROPOSAL.md`](./BUSINESS_PROPOSAL.md)
-describes the open-core model. Likely next steps:
-
-- **Free core:** `match_cv` + `tailor_cv` integration test through the MCP layer; richer keyword extraction (skill taxonomy).
-- **Distribution:** Windows installer via GitHub Releases; Chrome Web Store extension for form-field capture.
-- **Pro (separate hosted services):** AI CV tailoring & cover letters, encrypted cloud backup, multi-device sync, maintained site adapters, application analytics.
-- **Business:** multi-candidate accounts, team dashboards, white-label.
-
-Tool handlers are written so a Pro upgrade can slot in without changing the public
-tool surface — e.g. `tailor_cv` returns heuristic suggestions today and could call
-an AI service tomorrow.
-
----
-
-## Limitations
-
-- **Keyword extraction is heuristic** and will miss or mis-rank some skills. Confirm
-  against the source posting before relying on a match score.
-- **No browser automation.** Form fields must be supplied to `autofill_form`
-  (manually or, later, via the extension). The tool previews; it doesn't fill.
-- **LinkedIn / Indeed:** analysis-only, paste the description, submit manually.
-- **Alpha status:** APIs and stored schemas may change before 1.0.
-
----
-
-## License
+## 📜 License
 
 Copyright © 2026 Job Application MCP contributors.
 
-This program is free software: you can redistribute it and/or modify it under the
-terms of the **GNU Affero General Public License** as published by the Free Software
-Foundation, either version 3 of the License, or (at your option) any later version.
-See [`LICENSE`](./LICENSE).
+Free software under the **GNU Affero General Public License v3.0-or-later**. See [`LICENSE`](./LICENSE).
 
-A separate **commercial licence** is available for embedding without AGPL
-obligations — see [`BUSINESS_PROPOSAL.md`](./BUSINESS_PROPOSAL.md) §8.
+Commercial licensing without AGPL obligations: [`BUSINESS_PROPOSAL.md`](./BUSINESS_PROPOSAL.md).
 
 ---
 
-## Contributing
+## 🤝 Contributing
 
-Issues and PRs welcome. By contributing you agree your contributions will be
-licensed under the same AGPL-3.0-or-later terms.
+Issues and pull requests welcome. Contributions are licensed under the same AGPL-3.0-or-later terms.
 
-Please keep the free core **fully local and free** — no feature in this repo may
-gate a free-core capability behind a paid/network service. See
-[`CLAUDE.md`](./CLAUDE.md) for the conventions used in this codebase.
+Please keep the **free core fully local** — no gating basic usefulness behind a paid network service.
