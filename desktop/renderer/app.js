@@ -160,6 +160,14 @@ async function campaignStart() {
   const min = Number(els.campaignMinScore.value);
   const max = Number(els.campaignMaxDay.value);
   campaignAppendLog(`Starting campaign (${urls.length} URL(s))…`);
+  await window.jobMcp.saveCampaignConfig?.({
+    urls,
+    cv_id: campaignCvId,
+    min_match_score: Number.isFinite(min) ? min : 0,
+    max_applies_per_day: Number.isFinite(max) ? max : 10,
+    search_title: els.campaignSearchTitle.value.trim() || null,
+    search_location: els.campaignSearchLoc.value.trim() || null,
+  });
   const res = await call("start_campaign", {
     urls,
     cv_id: campaignCvId,

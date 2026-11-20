@@ -485,6 +485,15 @@ ipcMain.handle("campaign:stopWorker", () => {
 });
 ipcMain.handle("campaign:workerRunning", () => ({ running: Boolean(campaignProc) }));
 
+ipcMain.handle("campaign:saveConfig", (_e, config) => {
+  const dir = dataDir();
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, "campaign-last.json");
+  const payload = { ...config, saved_at: new Date().toISOString() };
+  fs.writeFileSync(file, JSON.stringify(payload, null, 2), "utf8");
+  return { ok: true, path: file };
+});
+
 app.on("window-all-closed", () => {
   stopCampaignWorker();
   stopBridge();
